@@ -9,7 +9,7 @@
          ========================================================================= -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor OCR Masivo - Rango 0 y Selector de Cámara (Con Auto-Detección)</title>
+    <title>Extractor OCR Masivo - Rango 0 y Selector de Cámara (Con Memoria de Recuadros)</title>
     
     <!-- SheetJS: Manejo y exportación de tablas a archivos Excel (.xlsx) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -162,7 +162,6 @@
         .btn-mode { opacity: 0.6; border: 2px solid transparent; font-size: 11px !important; padding: 5px !important; }
         .btn-mode.active { opacity: 1; border: 2px solid #fff; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
 
-        /* Botón de eliminar fila en tabla */
         .btn-eliminar-fila {
             background-color: #e74c3c; color: white; border: none; border-radius: 4px;
             width: 22px; height: 22px; font-weight: bold; cursor: pointer; display: inline-flex;
@@ -185,33 +184,20 @@
 <body>
 
     <div class="container">
-        <h1>📸 Extractor OCR Multimodo (Auto-Detección + Rango 0 + Cámara)</h1>
-        <p class="subtitle">Pestaña 1: Lote de fotos con posicionamiento automático | Pestaña 2: Cámara en vivo con recuadros fijos.</p>
+        <h1>📸 Extractor OCR Multimodo (Memoria de Recuadros + Rango 0 + Cámara)</h1>
+        <p class="subtitle">Dibuja tus recuadros una vez; se mantendrán fijos para todas las siguientes fotos hasta que decidas reubicarlos.</p>
 
-        <!-- =========================================================================
-             3. NAVEGACIÓN POR PESTAÑAS (TABS)
-             - Propósito: Alternar dinámicamente entre la interfaz de procesamiento 
-               por lote de imágenes y la interfaz de la cámara en tiempo real.
-             - Módulos complementarios: Se conecta con la función JavaScript `cambiarPestaña()` 
-               para ocultar/mostrar secciones y apagar flujos de video de manera segura.
-             ========================================================================= -->
         <div class="tabs-nav">
             <button class="tab-btn active" onclick="cambiarPestaña(1)">📂 Pestaña 1: Lote de Fotos</button>
             <button class="tab-btn" onclick="cambiarPestaña(2)">📷 Pestaña 2: Cámara en Vivo</button>
         </div>
 
-        <!-- =========================================================================
-             4. MÓDULO DE INTERFAZ - PESTAÑA 1 (LOTE DE FOTOS)
-             - Propósito: Contenedor visual completo para configurar rangos, subir 
-               fotografías individuales o carpetas masivas, autogenerar recuadros, 
-               visualizar con zoom y recopilar los datos en tabla.
-             ========================================================================= -->
+        <!-- PESTAÑA 1 -->
         <div id="tab-1" class="tab-content active">
             <div class="config-section">
                 <label for="num-rangos-1">Cantidad de recuadros OCR (1 a 20):</label>
                 <input type="number" id="num-rangos-1" min="1" max="20" value="4" onchange="appFotos.actualizarCantidadRangos()">
-                <button class="btn btn-warning" onclick="appFotos.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar Rangos</button>
-                <button class="btn btn-secondary" onclick="appFotos.cargarRecuadrosAutomaticos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px; background-color: #16a085;">⚡ Auto-ubicar Cuadros</button>
+                <button class="btn btn-warning" onclick="appFotos.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
             </div>
 
             <div class="upload-section">
@@ -236,7 +222,7 @@
                 <div class="pane">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <h3 style="margin:0; border:none;">Imagen (<span id="active-box-label-1">Rango 1</span>/<span id="total-box-label-1">4</span>)</h3>
-                        <button class="btn btn-warning" onclick="appFotos.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Borrar Recuadros</button>
+                        <button class="btn btn-warning" onclick="appFotos.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Reubicar / Redibujar</button>
                     </div>
 
                     <div style="display: flex; gap: 5px; margin-bottom: 8px;">
@@ -253,7 +239,7 @@
                             <div id="zoom-box-1" class="zoom-selection-box"></div>
                         </div>
                     </div>
-                    <p id="modo-instruccion-1" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Modo actual: Dibuja el recuadro o usa "Auto-ubicar Cuadros".</p>
+                    <p id="modo-instruccion-1" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja tus recuadros una vez. Se guardarán automáticamente para todas las fotos.</p>
                 </div>
 
                 <div class="pane">
@@ -280,11 +266,7 @@
             </div>
         </div>
 
-        <!-- =========================================================================
-             5. MÓDULO DE INTERFAZ - PESTAÑA 2 (CÁMARA EN VIVO)
-             - Propósito: Interfaz para transmitir video en tiempo real desde la cámara, 
-               aplicar autoubicación de recuadros y extraer texto de inmediato.
-             ========================================================================= -->
+        <!-- PESTAÑA 2 -->
         <div id="tab-2" class="tab-content">
             <div class="config-section">
                 <label for="num-rangos-2">Recuadros OCR:</label>
@@ -295,8 +277,7 @@
                     <option value="">-- Detectando cámaras... --</option>
                 </select>
 
-                <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar</button>
-                <button class="btn btn-secondary" onclick="appCamara.cargarRecuadrosAutomaticos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px; background-color: #16a085;">⚡ Auto-ubicar Cuadros</button>
+                <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
             </div>
 
             <div class="upload-section">
@@ -310,7 +291,7 @@
                 <div class="pane">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <h3 style="margin:0; border:none;">Proyección (<span id="active-box-label-2">Rango 1</span>/<span id="total-box-label-2">4</span>)</h3>
-                        <button class="btn btn-warning" onclick="appCamara.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Borrar Recuadros</button>
+                        <button class="btn btn-warning" onclick="appCamara.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Reubicar / Redibujar</button>
                     </div>
 
                     <div style="display: flex; gap: 5px; margin-bottom: 8px;">
@@ -327,7 +308,7 @@
                             <div id="zoom-box-2" class="zoom-selection-box"></div>
                         </div>
                     </div>
-                    <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Modo actual: Usa auto-ubicar o dibuja el recuadro de la cámara.</p>
+                    <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara.</p>
                 </div>
 
                 <div class="pane">
@@ -356,11 +337,6 @@
     </div>
 
     <script>
-        /* =========================================================================
-           6. MÓDULO DE CONTROL DE PESTAÑAS (GLOBAL)
-           - Propósito: Gestionar el cambio visual entre pestañas y apagar la cámara 
-             de forma segura al cambiar de sección.
-           ========================================================================= */
         function cambiarPestaña(num) {
             document.querySelectorAll('.tab-btn').forEach((btn, index) => {
                 btn.classList.toggle('active', index + 1 === num);
@@ -373,11 +349,6 @@
             }
         }
 
-        /* =========================================================================
-           7. CLASE LÓGICA PRINCIPAL: ExtractorOCRApp
-           - Propósito: Núcleo unificado que gestiona lotes de fotos, streaming de 
-             cámara, zoom, recortes, autoubicación de rangos y procesamiento OCR.
-           ========================================================================= */
         class ExtractorOCRApp {
             constructor(idSufijo, esCamara = false) {
                 this.id = idSufijo;
@@ -388,7 +359,7 @@
                 this.mediaElement = null;
                 
                 this.totalRangos = 4;
-                this.recuadrosActuales = []; 
+                this.recuadrosActuales = []; // Memoria activa de coordenadas
                 this.modoActual = 'seleccionar';
 
                 this.scale = 1;
@@ -413,19 +384,15 @@
                 }
             }
 
-            /* =========================================================================
-               8. MÓDULO DE DETECCIÓN Y LISTADO DE DISPOSITIVOS (CÁMARA)
-               ========================================================================= */
             async poblarListaCamaras() {
                 try {
                     await navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
                         stream.getTracks().forEach(track => track.stop());
-                    }).catch(e => console.log("Permiso inicial omitido o denegado:", e));
+                    }).catch(e => console.log("Permiso inicial omitido:", e));
 
                     const dispositivos = await navigator.mediaDevices.enumerateDevices();
                     const selectCam = document.getElementById(`select-camara`);
                     selectCam.innerHTML = '';
-
                     const videoDevices = dispositivos.filter(device => device.kind === 'videoinput');
 
                     if (videoDevices.length === 0) {
@@ -441,14 +408,9 @@
                     });
                 } catch (err) {
                     console.error("Error enumerando cámaras:", err);
-                    const selectCam = document.getElementById(`select-camara`);
-                    selectCam.innerHTML = '<option value="">Error al listar cámaras</option>';
                 }
             }
 
-            /* =========================================================================
-               9. MÓDULO DE CAMBIO DE MODOS INTERACTIVOS
-               ========================================================================= */
             cambiarModo(nuevoModo) {
                 this.modoActual = nuevoModo;
                 const container = document.getElementById(`container-${this.id}`);
@@ -464,7 +426,7 @@
                 if (this.modoActual === 'seleccionar') {
                     container.className = 'image-scroll-container modo-seleccionar';
                     btnSel.classList.add('active');
-                    txtInstruccion.innerText = "💡 Modo actual: Dibuja el recuadro o usa 'Auto-ubicar Cuadros'.";
+                    txtInstruccion.innerText = "💡 Modo actual: Dibuja los recuadros. Se recordarán para las siguientes imágenes.";
                 } else if (this.modoActual === 'zoom-area') {
                     container.className = 'image-scroll-container modo-zoom-area';
                     btnZoom.classList.add('active');
@@ -476,9 +438,6 @@
                 }
             }
 
-            /* =========================================================================
-               10. MÓDULO DE CONFIGURACIÓN DINÁMICA DE RANGOS Y CAMPOS
-               ========================================================================= */
             actualizarCantidadRangos() {
                 let val = parseInt(document.getElementById(`num-rangos-${this.id}`).value);
                 if (isNaN(val) || val < 1) val = 1;
@@ -489,11 +448,19 @@
                 
                 this.generarCamposFormulario();
                 this.actualizarTablaHeaders();
-                this.reiniciarRecuadrosActuales();
+                
+                // Si cambiamos la cantidad de rangos, limpiamos la memoria para que vuelva a dibujarlos
+                this.recuadrosActuales = [];
+                this.limpiarVisualesRecuadros();
+                this.actualizarUIformulario();
             }
 
             resetearConfiguracionRangos() {
-                this.actualizarCantidadRangos();
+                // Borra la memoria por completo para permitir redibujar desde cero
+                this.recuadrosActuales = [];
+                this.limpiarVisualesRecuadros();
+                this.actualizarUIformulario();
+                document.getElementById(`loading-status-${this.id}`).innerText = "🔄 Memoria de recuadros borrada. Dibuja los nuevos recuadros.";
             }
 
             generarCamposFormulario() {
@@ -525,59 +492,35 @@
                 trHead.innerHTML = html;
             }
 
-            /* =========================================================================
-               11. MÓDULO DE RECUADROS AUTOMÁTICOS (PREDEFINIDOS)
-               - Propósito: Posicionar de forma automática los recuadros OCR en 
-                 coordenadas fijas o preconfiguradas sobre la imagen o video en vivo.
-               ========================================================================= */
-            cargarRecuadrosAutomaticos() {
-                // AQUÍ PUEDES CONFIGURAR TUS COORDENADAS PREDEFINIDAS (left, top, width, height en píxeles)
-                // Puedes ajustarlas libremente según la posición estándar de tus documentos o cámara.
-                const recuadrosPredeterminados = [
-                    { left: 50,  top: 80,  width: 220, height: 35 }, // Rango 1
-                    { left: 50,  top: 130, width: 220, height: 35 }, // Rango 2
-                    { left: 50,  top: 180, width: 220, height: 35 }, // Rango 3
-                    { left: 300, top: 80,  width: 180, height: 35 }, // Rango 4
-                    { left: 300, top: 130, width: 180, height: 35 }, // Rango 5
-                    { left: 300, top: 180, width: 180, height: 35 }  // Rango 6 (puedes agregar más según necesites)
-                ];
+            limpiarVisualesRecuadros() {
+                const wrapper = document.getElementById(`wrapper-${this.id}`);
+                if (wrapper) {
+                    wrapper.querySelectorAll('.saved-box').forEach(el => el.remove());
+                }
+            }
 
+            redibujarRecuadrosEnPantalla() {
+                this.limpiarVisualesRecuadros();
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
                 
-                // Borramos recuadros previos
-                wrapper.querySelectorAll('.saved-box').forEach(el => el.remove());
-                this.recuadrosActuales = [];
-
-                const cantidadACargar = Math.min(recuadrosPredeterminados.length, this.totalRangos);
-
-                for (let i = 0; i < cantidadACargar; i++) {
-                    const boxData = recuadrosPredeterminados[i];
-                    this.recuadrosActuales.push(boxData);
-
+                this.recuadrosActuales.forEach((boxData, index) => {
                     const permBox = document.createElement('div');
                     permBox.className = 'saved-box';
                     permBox.style.left = boxData.left + 'px';
                     permBox.style.top = boxData.top + 'px';
                     permBox.style.width = boxData.width + 'px';
                     permBox.style.height = boxData.height + 'px';
-                    permBox.innerHTML = `<span>R${i + 1}</span>`;
+                    permBox.innerHTML = `<span>R${index + 1}</span>`;
                     wrapper.appendChild(permBox);
-                }
-
-                this.actualizarUIformulario();
-                document.getElementById(`loading-status-${this.id}`).innerText = `⚡ ${cantidadACargar} recuadros automáticos cargados con éxito.`;
+                });
             }
 
-            /* =========================================================================
-               12. MÓDULO DE GESTIÓN DE LA TABLA (RENDERIZADO Y ELIMINACIÓN)
-               ========================================================================= */
             renderizarTablaHTML() {
                 const tbody = document.querySelector(`#tabla-datos-${this.id} tbody`);
                 tbody.innerHTML = '';
 
                 this.tablaData.forEach((row, index) => {
                     const tr = document.createElement('tr');
-                    
                     let colPrincipal = this.esCamara ? (row['Captura / Hora'] || '') : (row['Archivo'] || '');
                     let html = `<td><button class="btn-eliminar-fila" onclick="app${this.esCamara ? 'Camara' : 'Fotos'}.eliminarFila(${index})" title="Quitar este registro">X</button></td>`;
                     html += `<td>${colPrincipal}</td>`;
@@ -596,11 +539,8 @@
                 this.renderizarTablaHTML();
             }
 
-            /* =========================================================================
-               13. MÓDULO DE LIMPIEZA GENERAL (BOTÓN DE LIMPIAR TODO)
-               ========================================================================= */
             limpiarTodoApp() {
-                if (!confirm("¿Estás seguro de que deseas limpiar todo (tabla, imágenes y campos)?")) return;
+                if (!confirm("¿Estás seguro de que deseas limpiar todo (tabla, imágenes y recuadros guardados)?")) return;
 
                 this.tablaData = [];
                 this.renderizarTablaHTML();
@@ -625,9 +565,6 @@
                 this.actualizarUIformulario();
             }
 
-            /* =========================================================================
-               14. MÓDULO DE CARGA DE ARCHIVOS / FOTOGRAFÍAS (LOTE)
-               ========================================================================= */
             cargarImagenes(event) {
                 const files = Array.from(event.target.files).filter(file => file.type.startsWith('image/'));
                 if (files.length === 0) return;
@@ -663,6 +600,7 @@
 
                 const foto = this.listaImagenes[this.indiceActual];
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
+                
                 wrapper.innerHTML = `
                     <img id="preview-img-${this.id}" class="preview-img" src="${foto.src}" alt="${foto.name}">
                     <div id="sel-box-${this.id}" class="selection-box"></div>
@@ -672,26 +610,27 @@
                 document.getElementById(`queue-banner-${this.id}`).style.display = 'flex';
                 document.getElementById(`queue-text-${this.id}`).innerText = `Foto ${this.indiceActual + 1} de ${this.listaImagenes.length}`;
                 document.getElementById(`current-filename-${this.id}`).innerText = `📁 ${foto.name}`;
-                document.getElementById(`loading-status-${this.id}`).innerText = `✅ Imagen cargada. Aplicando recuadros automáticos...`;
 
                 this.mediaElement = document.getElementById(`preview-img-${this.id}`);
-                this.recuadrosActuales = [];
-                this.actualizarUIformulario();
 
                 this.mediaElement.onload = () => {
                     this.resetZoom();
                     this.configurarInteraccionCanvas();
-                    this.cargarRecuadrosAutomaticos(); // <--- ¡Aplica los recuadros automáticos al cargar cada foto!
+                    
+                    // Mantiene los recuadros anteriores si ya se habían dibujado; si no, pide dibujarlos
+                    if (this.recuadrosActuales.length === this.totalRangos) {
+                        this.redibujarRecuadrosEnPantalla();
+                        document.getElementById(`loading-status-${this.id}`).innerText = `✅ Foto cargada. Usando ${this.totalRangos} recuadros guardados previamente.`;
+                    } else {
+                        document.getElementById(`loading-status-${this.id}`).innerText = `✏️ Dibuja los recuadros (${this.recuadrosActuales.length}/${this.totalRangos}).`;
+                    }
+                    this.actualizarUIformulario();
                 };
             }
 
-            /* =========================================================================
-               15. MÓDULO DE GESTIÓN DE CÁMARA (INICIAR / APAGAR STREAM)
-               ========================================================================= */
             async iniciarCamara() {
                 try {
                     this.apagarCamara();
-
                     const selectCam = document.getElementById(`select-camara`);
                     const deviceIdSelected = selectCam.value;
 
@@ -703,13 +642,19 @@
                     this.mediaElement = document.getElementById(`cam-video`);
                     this.mediaElement.srcObject = this.streamCamara;
                     
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ Cámara activa en vivo. Aplicando recuadros automáticos...";
                     this.resetZoom();
                     this.configurarInteraccionCanvas();
-                    this.cargarRecuadrosAutomaticos(); // <--- ¡Aplica los recuadros automáticos al encender la cámara!
+
+                    if (this.recuadrosActuales.length === this.totalRangos) {
+                        this.redibujarRecuadrosEnPantalla();
+                        document.getElementById(`loading-status-${this.id}`).innerText = "✅ Cámara activa. Usando recuadros guardados.";
+                    } else {
+                        document.getElementById(`loading-status-${this.id}`).innerText = `✏️ Cámara activa. Dibuja los recuadros (${this.recuadrosActuales.length}/${this.totalRangos}).`;
+                    }
+                    this.actualizarUIformulario();
                 } catch (err) {
                     console.error(err);
-                    alert("No se pudo iniciar la cámara seleccionada. Es posible que esté ocupada o falten permisos.");
+                    alert("No se pudo iniciar la cámara seleccionada.");
                 }
             }
 
@@ -737,9 +682,6 @@
                 }
             }
 
-            /* =========================================================================
-               16. MÓDULO DE INTERACCIÓN CANVAS (ZOOM, SCROLL Y DIBUJO DE RECUADROS)
-               ========================================================================= */
             configurarInteraccionCanvas() {
                 const container = document.getElementById(`container-${this.id}`);
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
@@ -764,9 +706,8 @@
                     }
 
                     this.scale = Math.max(0.5, Math.min(this.scale, 15));
-
                     this.panX = mouseX - (mouseX - this.panX) * (this.scale / oldScale);
-                    this.panY = mouseY - ( mouseY - this.panY) * (this.scale / oldScale);
+                    this.panY = mouseY - (mouseY - this.panY) * (this.scale / oldScale);
 
                     this.actualizarTransformacionCanvas();
                 };
@@ -783,6 +724,11 @@
                             document.addEventListener('mousemove', onMouseMoveGlobal);
                             document.addEventListener('mouseup', onMouseUpGlobal);
                             e.preventDefault();
+                            return;
+                        }
+
+                        // Si ya completamos todos los recuadros y hacemos clic en modo seleccionar, ignoramos el dibujo a menos que le den a reubicar
+                        if (this.recuadrosActuales.length >= this.totalRangos && this.modoActual === 'seleccionar') {
                             return;
                         }
 
@@ -847,7 +793,6 @@
                         if (width > 5 && height > 5) {
                             const boxLeft = parseFloat(zoomBox.style.left);
                             const boxTop = parseFloat(zoomBox.style.top);
-
                             const containerWidth = container.clientWidth;
                             const containerHeight = container.clientHeight;
 
@@ -872,7 +817,6 @@
 
                     if (width > 3 && height > 3) {
                         if (this.recuadrosActuales.length >= this.totalRangos) {
-                            alert(`Ya has seleccionado los ${this.totalRangos} recuadros.`);
                             return;
                         }
 
@@ -897,22 +841,23 @@
                         this.actualizarUIformulario();
 
                         if (this.recuadrosActuales.length < this.totalRangos) {
-                            document.getElementById(`loading-status-${this.id}`).innerText = `✅ Rango ${this.recuadrosActuales.length} guardado.`;
+                            document.getElementById(`loading-status-${this.id}`).innerText = `✅ Rango ${this.recuadrosActuales.length} guardado en memoria. Falta(n) ${this.totalRangos - this.recuadrosActuales.length}.`;
                         } else {
-                            document.getElementById(`loading-status-${this.id}`).innerText = `🎉 ¡${this.totalRangos} recuadros listos para ejecutar OCR!`;
+                            document.getElementById(`loading-status-${this.id}`).innerText = `🎉 ¡${this.totalRangos} recuadros guardados permanentemente para las siguientes fotos!`;
                         }
                     }
                 };
             }
 
             actualizarUIformulario() {
-                document.getElementById(`active-box-label-${this.id}`).innerText = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
+                const siguienteRango = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
+                document.getElementById(`active-box-label-${this.id}`).innerText = siguienteRango;
             }
 
             reiniciarRecuadrosActuales() {
-                const wrapper = document.getElementById(`wrapper-${this.id}`);
-                wrapper.querySelectorAll('.saved-box').forEach(el => el.remove());
+                // El botón "🔄 Reubicar / Redibujar" limpia los recuadros actuales para permitirte dibujarlos de nuevo
                 this.recuadrosActuales = [];
+                this.limpiarVisualesRecuadros();
                 const selBox = document.getElementById(`sel-box-${this.id}`);
                 const zoomBox = document.getElementById(`zoom-box-${this.id}`);
                 if (selBox) selBox.style.display = 'none';
@@ -922,13 +867,10 @@
                     const input = document.getElementById(`rango-${this.id}-${i}`);
                     if(input) input.value = '';
                 }
-                document.getElementById(`loading-status-${this.id}`).innerText = "🔄 Recuadros reiniciados.";
+                document.getElementById(`loading-status-${this.id}`).innerText = "🔄 MODO REUBICACIÓN: Dibuja los recuadros nuevamente.";
                 this.actualizarUIformulario();
             }
 
-            /* =========================================================================
-               17. MÓDULO DE PROCESAMIENTO OCR MASIVO (FOTOS)
-               ========================================================================= */
             async ejecutarProcesoYpasarSiguiente() {
                 if (this.listaImagenes.length === 0) {
                     alert("No hay imágenes cargadas.");
@@ -936,7 +878,7 @@
                 }
 
                 if (this.recuadrosActuales.length < this.totalRangos) {
-                    alert(`Debes tener al menos los ${this.totalRangos} recuadros configurados antes de ejecutar.`);
+                    alert(`Debes terminar de dibujar los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
                     return;
                 }
 
@@ -945,7 +887,7 @@
                 }
 
                 const foto = this.listaImagenes[this.indiceActual];
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Ejecutando OCR en los recuadros...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Ejecutando OCR en los recuadros guardados...";
 
                 const scaleX = this.mediaElement.naturalWidth / this.mediaElement.width;
                 const scaleY = this.mediaElement.naturalHeight / this.mediaElement.height;
@@ -1003,7 +945,7 @@
                     document.getElementById(`rango-${this.id}-0`).value = '';
                     document.getElementById(`rango-${this.id}-0`).focus();
 
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡Procesado con éxito! Pasando a la siguiente foto...";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡Procesado con recuadros guardados! Pasando a la siguiente foto...";
 
                     setTimeout(() => {
                         this.indiceActual++;
@@ -1011,7 +953,7 @@
                             this.mostrarFotoActual();
                         } else {
                             this.indiceActual = this.listaImagenes.length - 1;
-                            document.getElementById(`loading-status-${this.id}`).innerText = "🏁 ¡Lote completado!";
+                            document.getElementById(`loading-status-${this.id}`).innerText = "🏁 ¡Lote completado con éxito!";
                         }
                     }, 1000);
 
@@ -1021,12 +963,9 @@
                 }
             }
 
-            /* =========================================================================
-               18. MÓDULO DE PROCESAMIENTO OCR EN VIVO (CÁMARA)
-               ========================================================================= */
             async ejecutarProcesoCamara() {
                 if (this.recuadrosActuales.length < this.totalRangos) {
-                    alert(`Debes tener al menos los ${this.totalRangos} recuadros configurados.`);
+                    alert(`Debes terminar de dibujar los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
                     return;
                 }
 
@@ -1035,7 +974,7 @@
                     return;
                 }
 
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando fotograma y procesando OCR...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando fotograma de cámara...";
 
                 const videoEl = document.getElementById(`cam-video`);
                 const natW = videoEl.videoWidth || 1280;
@@ -1092,17 +1031,14 @@
                     document.getElementById(`rango-${this.id}-0`).value = '';
                     document.getElementById(`rango-${this.id}-0`).focus();
 
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR de cámara completado!";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR de cámara completado usando recuadros fijos!";
 
                 } catch (err) {
                     console.error(err);
-                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al procesar el OCR desde la cámara.";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al procesar el OCR de la cámara.";
                 }
             }
 
-            /* =========================================================================
-               19. MÓDULO DE EXPORTACIÓN A EXCEL
-               ========================================================================= */
             exportarExcel() {
                 if (this.tablaData.length === 0) {
                     alert("La tabla está vacía.");
@@ -1115,9 +1051,6 @@
             }
         }
 
-        /* =========================================================================
-           20. INICIALIZACIÓN DE INSTANCIAS (GLOBALES)
-           ========================================================================= */
         const appFotos = new ExtractorOCRApp('1', false);
         const appCamara = new ExtractorOCRApp('2', true);
 
