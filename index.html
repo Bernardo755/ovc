@@ -328,7 +328,6 @@
                 document.getElementById(`btn-exportar-${this.id}`).addEventListener('click', () => this.exportarExcel());
                 document.getElementById(`btn-limpiar-${this.id}`).addEventListener('click', () => this.limpiarTodoApp());
 
-                // Control numérico dinámico de campos (1 a 20)
                 document.getElementById(`num-campos-${this.id}`).addEventListener('change', (e) => {
                     let val = parseInt(e.target.value);
                     if (val < 1) val = 1; if (val > 20) val = 20;
@@ -342,7 +341,6 @@
                     this.actualizarUIformulario();
                 });
 
-                // Listeners de los Sliders de Brillo/Contraste Visual en Pantalla
                 ['brillo', 'contraste'].forEach(tipo => {
                     document.getElementById(`input-${tipo}-${this.id}`).addEventListener('input', (e) => {
                         document.getElementById(`val-${tipo}-${this.id}`).innerText = e.target.value;
@@ -389,7 +387,6 @@
                 } catch (e) { console.error(e); }
             }
 
-            // APLICACIÓN INDEPENDIENTE DE PROCESAMIENTO ACTIVO CON OPENCV.JS
             aplicarMejorasOpenCV(canvasSource) {
                 if (typeof cv === 'undefined' || !cv.Mat) {
                     console.warn("OpenCV cargando...");
@@ -404,14 +401,12 @@
                     let usarOtsu = document.getElementById(`cv-otsu-${this.id}`).checked;
                     let usarDenoise = document.getElementById(`cv-denoise-${this.id}`).checked;
 
-                    // 1. Escala de grises
                     if (usarGris || usarOtsu) {
                         cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
                     } else {
                         src.copyTo(dst);
                     }
 
-                    // 2. Reducción de ruido avanzada (Filtro bilateral) si está activa
                     if (usarDenoise) {
                         let tmp = new cv.Mat();
                         cv.bilateralFilter(dst, tmp, 9, 75, 75);
@@ -419,10 +414,8 @@
                         dst = tmp;
                     }
 
-                    // 3. Binarización por Umbral Otsu
                     if (usarOtsu) {
                         let tmp = new cv.Mat();
-                        // Si no pasó por gris antes, aseguramos escala de grises para Otsu
                         if (!usarGris && !usarDenoise) {
                             cv.cvtColor(dst, tmp, cv.COLOR_RGBA2GRAY, 0);
                             cv.threshold(tmp, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
@@ -725,10 +718,7 @@
                         resultados[i] = await new Promise(resolve => {
                             imgObj.onload = async () => {
                                 ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                                
-                                // APLICANDO FILTROS OPENCV INDEPENDIENTES
                                 let processedDataUrl = this.aplicarMejorasOpenCV(canvas);
-                                
                                 let ret = await worker.recognize(processedDataUrl);
                                 resolve(ret.data.text.trim().replace(/\s+/g, ' '));
                             };
@@ -770,9 +760,8 @@
                         let canvas = document.createElement('canvas');
                         canvas.width = w; canvas.height = h;
                         let ctx = canvas.getContext('2d');
+                        
                         ctx.drawImage(videoEl, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-
-                        // APLICANDO FILTROS OPENCV INDEPENDIENTES
                         let processedDataUrl = this.aplicarMejorasOpenCV(canvas);
 
                         let ret = await worker.recognize(processedDataUrl);
