@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor OCR Inteligente con OpenCV</title>
+    <title>Extractor OCR Inteligente con OpenCV Avanzado</title>
     
     <!-- Tesseract, SheetJS y OpenCV.js -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -74,13 +74,13 @@
         }
 
         .sidebar {
-            width: 350px;
+            width: 360px;
             background: var(--panel-bg);
-            padding: 20px;
+            padding: 15px;
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             overflow-y: auto;
         }
 
@@ -113,7 +113,6 @@
             pointer-events: none;
         }
 
-        /* Estilos de recuadros dinamicos */
         .selection-box {
             position: absolute; border: 2px dashed #ffeb3b; background: rgba(255, 235, 59, 0.2);
             pointer-events: none; display: none; z-index: 10;
@@ -130,7 +129,7 @@
 
         input[type="text"], input[type="file"], input[type="number"], select {
             width: 100%; padding: 8px; background: #111; border: 1px solid var(--border);
-            color: #fff; border-radius: 5px; outline: none; margin-bottom: 5px;
+            color: #fff; border-radius: 5px; outline: none; margin-bottom: 3px;
         }
 
         .btn {
@@ -150,7 +149,7 @@
         .toolbar .btn.active { background: var(--accent); }
 
         .table-container {
-            height: 220px; background: var(--panel-bg); overflow: auto; border-top: 1px solid var(--border);
+            height: 200px; background: var(--panel-bg); overflow: auto; border-top: 1px solid var(--border);
         }
 
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -161,18 +160,18 @@
             background: #111; padding: 8px 15px; font-size: 13px; color: #4caf50; font-weight: bold;
         }
 
-        .filters-container {
-            background: #222; padding: 12px; border-radius: 8px; border: 1px solid #444;
+        .section-box {
+            background: #222; padding: 10px; border-radius: 6px; border: 1px solid #444;
         }
-        .filters-container input[type="range"] { width: 100%; margin: 5px 0 10px; cursor: pointer; }
+        .section-box h4 { margin: 0 0 6px 0; font-size: 12px; color: #ddd; display: flex; align-items: center; gap: 6px; }
         
         .dynamic-fields-container {
-            max-height: 180px;
+            max-height: 140px;
             overflow-y: auto;
-            background: #222;
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #444;
+            background: #1a1a1a;
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #333;
         }
     </style>
 </head>
@@ -198,7 +197,7 @@
             constructor(id, esCamara) {
                 this.id = id;
                 this.esCamara = esCamara;
-                this.totalRangos = 3; // Valor inicial por defecto
+                this.totalRangos = 3;
                 this.tablaData = [];
                 this.recuadrosActuales = [];
                 this.modoActual = 'seleccionar';
@@ -209,7 +208,6 @@
                 this.isDraggingImage = false;
                 this.mediaElement = null;
                 this.streamCamara = null;
-                
                 this.listaImagenes = [];
                 this.indiceActual = 0;
             }
@@ -223,15 +221,15 @@
             setupHTML() {
                 const appContainer = document.getElementById(`app-${this.id}`);
                 let inputArea = !this.esCamara 
-                    ? `<label>Subir Imágenes o Carpeta:</label><input type="file" id="file-upload-${this.id}" multiple accept="image/*">
-                       <div id="queue-banner-${this.id}" style="display:none; background:#333; padding:8px; border-radius:5px; text-align:center;">
-                           <span id="queue-text-${this.id}" style="font-weight:bold; color:var(--accent);"></span><br>
+                    ? `<label style="font-size:12px;">Subir Imágenes / Carpeta:</label><input type="file" id="file-upload-${this.id}" multiple accept="image/*">
+                       <div id="queue-banner-${this.id}" style="display:none; background:#333; padding:6px; border-radius:4px; text-align:center;">
+                           <span id="queue-text-${this.id}" style="font-weight:bold; color:var(--accent); font-size:12px;"></span><br>
                            <span id="current-filename-${this.id}" style="font-size:11px; color:#aaa;"></span>
                        </div>`
-                    : `<label>Cámara:</label><select id="select-camara"></select>
+                    : `<label style="font-size:12px;">Cámara:</label><select id="select-camara"></select>
                        <div style="display:flex; gap:5px;">
-                           <button class="btn btn-primary" id="btn-iniciar-cam-${this.id}"><i class="fas fa-play"></i> Iniciar</button>
-                           <button class="btn btn-danger" id="btn-apagar-cam-${this.id}"><i class="fas fa-stop"></i> Apagar</button>
+                           <button class="btn btn-primary" id="btn-iniciar-cam-${this.id}" style="padding:6px;"><i class="fas fa-play"></i> Iniciar</button>
+                           <button class="btn btn-danger" id="btn-apagar-cam-${this.id}" style="padding:6px;"><i class="fas fa-stop"></i> Apagar</button>
                        </div>`;
 
                 appContainer.innerHTML = `
@@ -239,38 +237,47 @@
                         ${inputArea}
                         
                         <div>
-                            <label style="color:var(--accent); font-weight:bold;"><i class="fas fa-list-ol"></i> Cantidad de Campos (1 - 20):</label>
+                            <label style="color:var(--accent); font-weight:bold; font-size:12px;"><i class="fas fa-list-ol"></i> Cantidad de Campos (1 - 20):</label>
                             <input type="number" id="num-campos-${this.id}" min="1" max="20" value="3">
                         </div>
 
-                        <div class="filters-container">
-                            <h4 style="margin: 0 0 8px 0; font-size: 13px; color:#ddd;"><i class="fas fa-microchip"></i> OpenCV Pre-Procesamiento</h4>
-                            <label style="font-size: 11px;">Brillo OpenCV: <span id="val-brillo-${this.id}">0</span> (-100 a 100)</label>
-                            <input type="range" id="input-brillo-${this.id}" min="-100" max="100" value="0">
+                        <!-- 1. BLOQUE: AJUSTES VISUALES DE BRILLO Y CONTRASTE -->
+                        <div class="section-box">
+                            <h4><i class="fas fa-adjust"></i> Ajuste Visual (Pantalla)</h4>
+                            <label style="font-size: 11px;">Brillo Visual: <span id="val-brillo-${this.id}">100</span>%</label>
+                            <input type="range" id="input-brillo-${this.id}" min="20" max="250" value="100" style="width:100%; cursor:pointer;">
                             
-                            <label style="font-size: 11px;">Contraste OpenCV: <span id="val-contraste-${this.id}">1.0</span> (0.5 a 3.0)</label>
-                            <input type="range" id="input-contraste-${this.id}" min="0.5" max="3.0" step="0.1" value="1.0">
-                            
-                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer; margin-top:5px;">
-                                <input type="checkbox" id="input-bn-${this.id}" checked style="margin-right:5px; cursor:pointer;"> Binarización Otsu (OpenCV)
+                            <label style="font-size: 11px;">Contraste Visual: <span id="val-contraste-${this.id}">100</span>%</label>
+                            <input type="range" id="input-contraste-${this.id}" min="20" max="250" value="100" style="width:100%; cursor:pointer;">
+                        </div>
+
+                        <!-- 2. BLOQUE: MEJORAS DE IMAGEN ACTIVAS CON OPENCV -->
+                        <div class="section-box" style="border-color: #4a90e2;">
+                            <h4><i class="fas fa-microchip"></i> Motor de OpenCV Activo</h4>
+                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer; margin-bottom:4px;">
+                                <input type="checkbox" id="cv-gris-${this.id}" checked style="margin-right:6px; cursor:pointer;"> 1. Convertir a Escala de Grises
+                            </label>
+                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer; margin-bottom:4px;">
+                                <input type="checkbox" id="cv-otsu-${this.id}" checked style="margin-right:6px; cursor:pointer;"> 2. Binarización Umbral Otsu
+                            </label>
+                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer;">
+                                <input type="checkbox" id="cv-denoise-${this.id}" style="margin-right:6px; cursor:pointer;"> 3. Reducción Avanzada de Ruido
                             </label>
                         </div>
 
                         <div>
                             <label style="color:#ffeb3b; font-size:12px;"><i class="fas fa-keyboard"></i> R0 (Referencia Manual):</label>
-                            <input type="text" id="rango-${this.id}-0" placeholder="Escribe el n° de referencia...">
+                            <input type="text" id="rango-${this.id}-0" placeholder="Referencia...">
                         </div>
                         
-                        <div style="background:#222; padding:8px; border-radius:5px; border:1px solid #444;">
-                            <h4 style="margin-bottom:8px; font-size:12px; text-align:center;">Resultados OCR por Campos</h4>
-                            <div class="dynamic-fields-container" id="dynamic-inputs-container-${this.id}">
-                                <!-- Generado dinamicamente -->
-                            </div>
+                        <div class="section-box">
+                            <h4 style="justify-content: center;">Resultados OCR por Campos</h4>
+                            <div class="dynamic-fields-container" id="dynamic-inputs-container-${this.id}"></div>
                         </div>
 
                         <button id="btn-ejecutar-${this.id}" class="btn btn-success"><i class="fas fa-bolt"></i> Ejecutar OCR</button>
                         <button id="btn-reubicar-${this.id}" class="btn" style="background:#e67e22;"><i class="fas fa-sync-alt"></i> Redibujar Recuadros</button>
-                        <button id="btn-exportar-${this.id}" class="btn btn-primary"><i class="fas fa-file-excel"></i> Exportar a Excel</button>
+                        <button id="btn-exportar-${this.id}" class="btn btn-primary"><i class="fas fa-file-excel"></i> Exportar Excel</button>
                         <button id="btn-limpiar-${this.id}" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Limpiar Todo</button>
                     </div>
                     
@@ -279,7 +286,7 @@
                             <button class="btn active" id="mode-sel-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('seleccionar')"><i class="fas fa-vector-square"></i> Dibujar (R<span id="active-box-label-${this.id}">1</span>)</button>
                             <button class="btn" id="mode-nav-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('navegar')"><i class="fas fa-hand-paper"></i> Navegar</button>
                             <button class="btn" id="mode-zoom-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('zoom-area')"><i class="fas fa-search-plus"></i> Zoom Área</button>
-                            <button class="btn" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.resetZoom()"><i class="fas fa-expand"></i> Reset Visión</button>
+                            <button class="btn" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.resetZoom()"><i class="fas fa-expand"></i> Reset</button>
                         </div>
 
                         <div class="media-container" id="container-${this.id}">
@@ -290,7 +297,7 @@
                             </div>
                         </div>
 
-                        <div class="status-bar" id="loading-status-${this.id}">Esperando OpenCV y acciones...</div>
+                        <div class="status-bar" id="loading-status-${this.id}">Sistema listo.</div>
 
                         <div class="table-container">
                             <table id="tabla-${this.id}">
@@ -321,11 +328,10 @@
                 document.getElementById(`btn-exportar-${this.id}`).addEventListener('click', () => this.exportarExcel());
                 document.getElementById(`btn-limpiar-${this.id}`).addEventListener('click', () => this.limpiarTodoApp());
 
-                // Cambio dinámico de cantidad de campos (1 a 20)
+                // Control numérico dinámico de campos (1 a 20)
                 document.getElementById(`num-campos-${this.id}`).addEventListener('change', (e) => {
                     let val = parseInt(e.target.value);
-                    if (val < 1) val = 1;
-                    if (val > 20) val = 20;
+                    if (val < 1) val = 1; if (val > 20) val = 20;
                     e.target.value = val;
                     this.totalRangos = val;
                     this.actualizarInputsDinamicosYTabla();
@@ -336,37 +342,40 @@
                     this.actualizarUIformulario();
                 });
 
-                // Listeners sliders de OpenCV
-                ['input-brillo-', 'input-contraste-'].forEach(prefix => {
-                    const el = document.getElementById(`${prefix}${this.id}`);
-                    if(el) el.addEventListener('input', () => {
-                        document.getElementById(`val-brillo-${this.id}`).innerText = document.getElementById(`input-brillo-${this.id}`).value;
-                        document.getElementById(`val-contraste-${this.id}`).innerText = document.getElementById(`input-contraste-${this.id}`).value;
+                // Listeners de los Sliders de Brillo/Contraste Visual en Pantalla
+                ['brillo', 'contraste'].forEach(tipo => {
+                    document.getElementById(`input-${tipo}-${this.id}`).addEventListener('input', (e) => {
+                        document.getElementById(`val-${tipo}-${this.id}`).innerText = e.target.value;
+                        this.actualizarFiltroVisualPantalla();
                     });
                 });
 
                 this.actualizarInputsDinamicosYTabla();
             }
 
+            actualizarFiltroVisualPantalla() {
+                const b = document.getElementById(`input-brillo-${this.id}`).value;
+                const c = document.getElementById(`input-contraste-${this.id}`).value;
+                if (this.mediaElement) {
+                    this.mediaElement.style.filter = `brightness(${b}%) contrast(${c}%)`;
+                }
+            }
+
             actualizarInputsDinamicosYTabla() {
-                // Inputs laterales
                 const container = document.getElementById(`dynamic-inputs-container-${this.id}`);
                 container.innerHTML = '';
                 for (let i = 1; i <= this.totalRangos; i++) {
                     container.innerHTML += `
-                        <div style="margin-bottom:6px;">
-                            <label style="font-size:11px; color:#aaa;">Rango ${i}:</label>
-                            <input type="text" id="rango-${this.id}-${i}" readonly style="background:#1a1a1a; color:#4caf50; font-weight:bold; padding:5px;">
+                        <div style="margin-bottom:4px;">
+                            <label style="font-size:10px; color:#aaa;">Rango ${i}:</label>
+                            <input type="text" id="rango-${this.id}-${i}" readonly style="background:#111; color:#4caf50; font-weight:bold; padding:4px; font-size:11px;">
                         </div>
                     `;
                 }
 
-                // Columnas de la tabla inferior
                 const trHead = document.getElementById(`table-head-tr-${this.id}`);
-                let htmlTh = `<th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th><th>R0 (Manual)</th>`;
-                for (let i = 1; i <= this.totalRangos; i++) {
-                    htmlTh += `<th>R${i}</th>`;
-                }
+                let htmlTh = `<th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th><th>R0</th>`;
+                for (let i = 1; i <= this.totalRangos; i++) htmlTh += `<th>R${i}</th>`;
                 trHead.innerHTML = htmlTh;
                 this.tablaData = [];
                 this.renderizarTablaHTML();
@@ -376,15 +385,14 @@
                 try {
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                    const select = document.getElementById(`select-camara`);
-                    select.innerHTML = videoDevices.map(d => `<option value="${d.deviceId}">${d.label || 'Cámara'}</option>`).join('');
+                    document.getElementById(`select-camara`).innerHTML = videoDevices.map(d => `<option value="${d.deviceId}">${d.label || 'Cámara'}</option>`).join('');
                 } catch (e) { console.error(e); }
             }
 
-            // PROCESAMIENTO MATEMÁTICO CON OPENCV.JS
-            procesarConOpenCV(canvasSource) {
+            // APLICACIÓN INDEPENDIENTE DE PROCESAMIENTO ACTIVO CON OPENCV.JS
+            aplicarMejorasOpenCV(canvasSource) {
                 if (typeof cv === 'undefined' || !cv.Mat) {
-                    console.warn("OpenCV aún no carga completamente, devolviendo canvas original.");
+                    console.warn("OpenCV cargando...");
                     return canvasSource.toDataURL('image/png');
                 }
 
@@ -392,26 +400,45 @@
                     let src = cv.imread(canvasSource);
                     let dst = new cv.Mat();
 
-                    let brillo = parseInt(document.getElementById(`input-brillo-${this.id}`).value);
-                    let contraste = parseFloat(document.getElementById(`input-contraste-${this.id}`).value);
-                    let usarBn = document.getElementById(`input-bn-${this.id}`).checked;
+                    let usarGris = document.getElementById(`cv-gris-${this.id}`).checked;
+                    let usarOtsu = document.getElementById(`cv-otsu-${this.id}`).checked;
+                    let usarDenoise = document.getElementById(`cv-denoise-${this.id}`).checked;
 
-                    // 1. Aplicar Brillo y Contraste: dst = src * alpha + beta
-                    src.convertTo(dst, -1, contraste, brillo);
+                    // 1. Escala de grises
+                    if (usarGris || usarOtsu) {
+                        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
+                    } else {
+                        src.copyTo(dst);
+                    }
 
-                    // 2. Si está activado, pasar a Grises y binarizar con Otsu
-                    if (usarBn) {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY, 0);
-                        cv.threshold(gray, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-                        gray.delete();
+                    // 2. Reducción de ruido avanzada (Filtro bilateral) si está activa
+                    if (usarDenoise) {
+                        let tmp = new cv.Mat();
+                        cv.bilateralFilter(dst, tmp, 9, 75, 75);
+                        dst.delete();
+                        dst = tmp;
+                    }
+
+                    // 3. Binarización por Umbral Otsu
+                    if (usarOtsu) {
+                        let tmp = new cv.Mat();
+                        // Si no pasó por gris antes, aseguramos escala de grises para Otsu
+                        if (!usarGris && !usarDenoise) {
+                            cv.cvtColor(dst, tmp, cv.COLOR_RGBA2GRAY, 0);
+                            cv.threshold(tmp, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                            tmp.delete();
+                        } else {
+                            cv.threshold(dst, tmp, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                            dst.delete();
+                            dst = tmp;
+                        }
                     }
 
                     cv.imshow(canvasSource, dst);
                     src.delete();
                     dst.delete();
                 } catch (err) {
-                    console.error("Error en procesamiento OpenCV:", err);
+                    console.error("Error aplicando OpenCV:", err);
                 }
 
                 return canvasSource.toDataURL('image/png');
@@ -425,9 +452,7 @@
                 
                 let btnId = modo === 'seleccionar' ? `mode-sel-${this.id}` : (modo === 'navegar' ? `mode-nav-${this.id}` : `mode-zoom-${this.id}`);
                 document.getElementById(btnId).classList.add('active');
-                
-                const container = document.getElementById(`container-${this.id}`);
-                container.style.cursor = modo === 'navegar' ? 'grab' : (modo === 'zoom-area' ? 'zoom-in' : 'crosshair');
+                document.getElementById(`container-${this.id}`).style.cursor = modo === 'navegar' ? 'grab' : (modo === 'zoom-area' ? 'zoom-in' : 'crosshair');
             }
 
             renderizarTablaHTML() {
@@ -437,14 +462,11 @@
                     const tr = document.createElement('tr');
                     const keyMain = this.esCamara ? 'Captura / Hora' : 'Archivo';
                     let htmlTd = `<td>${row[keyMain] || ''}</td><td>${row['R0'] || ''}</td>`;
-                    for(let i=1; i<=this.totalRangos; i++) {
-                        htmlTd += `<td>${row[`R${i}`] || ''}</td>`;
-                    }
+                    for(let i=1; i<=this.totalRangos; i++) htmlTd += `<td>${row[`R${i}`] || ''}</td>`;
                     tr.innerHTML = htmlTd;
                     tbody.appendChild(tr);
                 });
-                const container = tbody.parentElement.parentElement;
-                container.scrollTop = container.scrollHeight;
+                tbody.parentElement.parentElement.scrollTop = tbody.parentElement.parentElement.scrollHeight;
             }
 
             redibujarRecuadrosEnPantalla() {
@@ -453,10 +475,8 @@
                 this.recuadrosActuales.forEach((b, index) => {
                     const permBox = document.createElement('div');
                     permBox.className = 'saved-box';
-                    permBox.style.left = b.left + 'px';
-                    permBox.style.top = b.top + 'px';
-                    permBox.style.width = b.width + 'px';
-                    permBox.style.height = b.height + 'px';
+                    permBox.style.left = b.left + 'px'; permBox.style.top = b.top + 'px';
+                    permBox.style.width = b.width + 'px'; permBox.style.height = b.height + 'px';
                     permBox.innerHTML = `<span>R${index + 1}</span>`;
                     wrapper.appendChild(permBox);
                 });
@@ -468,12 +488,11 @@
             }
 
             limpiarTodoApp() {
-                if (!confirm("¿Deseas limpiar todos los registros y recuadros?")) return;
+                if (!confirm("¿Deseas limpiar todos los registros?")) return;
                 this.tablaData = [];
                 this.renderizarTablaHTML();
                 this.recuadrosActuales = [];
                 this.reiniciarRecuadrosActuales();
-
                 if (!this.esCamara) {
                     this.listaImagenes = [];
                     this.indiceActual = 0;
@@ -488,7 +507,6 @@
             cargarImagenes(event) {
                 const files = Array.from(event.target.files).filter(file => file.type.startsWith('image/'));
                 if (files.length === 0) return;
-
                 this.listaImagenes = [];
                 let cargados = 0;
                 files.forEach((file) => {
@@ -509,7 +527,6 @@
             mostrarFotoActual() {
                 if (this.listaImagenes.length === 0) return;
                 if (this.indiceActual >= this.listaImagenes.length) this.indiceActual = this.listaImagenes.length - 1;
-
                 const foto = this.listaImagenes[this.indiceActual];
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
                 wrapper.innerHTML = `
@@ -517,7 +534,6 @@
                     <div id="sel-box-${this.id}" class="selection-box"></div>
                     <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
                 `;
-
                 document.getElementById(`queue-banner-${this.id}`).style.display = 'block';
                 document.getElementById(`queue-text-${this.id}`).innerText = `Foto ${this.indiceActual + 1} de ${this.listaImagenes.length}`;
                 document.getElementById(`current-filename-${this.id}`).innerText = `📁 ${foto.name}`;
@@ -525,10 +541,9 @@
                 this.mediaElement = document.getElementById(`preview-img-${this.id}`);
                 this.mediaElement.onload = () => {
                     this.resetZoom();
+                    this.actualizarFiltroVisualPantalla();
                     this.configurarInteraccionCanvas();
-                    if (this.recuadrosActuales.length === this.totalRangos) {
-                        this.redibujarRecuadrosEnPantalla();
-                    }
+                    if (this.recuadrosActuales.length === this.totalRangos) this.redibujarRecuadrosEnPantalla();
                     this.actualizarUIformulario();
                 };
             }
@@ -540,21 +555,20 @@
                     this.streamCamara = await navigator.mediaDevices.getUserMedia({
                         video: deviceId ? { deviceId: { exact: deviceId } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
                     });
-                    
                     const wrapper = document.getElementById(`wrapper-${this.id}`);
                     wrapper.innerHTML = `
                         <video id="cam-video" autoplay playsinline></video>
                         <div id="sel-box-${this.id}" class="selection-box"></div>
                         <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
                     `;
-
                     this.mediaElement = document.getElementById(`cam-video`);
                     this.mediaElement.srcObject = this.streamCamara;
                     this.resetZoom();
+                    this.actualizarFiltroVisualPantalla();
                     this.configurarInteraccionCanvas();
                     if (this.recuadrosActuales.length === this.totalRangos) this.redibujarRecuadrosEnPantalla();
                     this.actualizarUIformulario();
-                } catch (err) { alert("No se pudo abrir la cámara."); }
+                } catch (e) { alert("No se pudo iniciar la cámara."); }
             }
 
             apagarCamara() {
@@ -679,7 +693,7 @@
                 document.getElementById(`zoom-box-${this.id}`).style.display = 'none';
                 for (let i = 1; i <= this.totalRangos; i++) {
                     let inp = document.getElementById(`rango-${this.id}-${i}`);
-                    if(inp) inp.value = '';
+                    if (inp) inp.value = '';
                 }
                 this.actualizarUIformulario();
             }
@@ -689,7 +703,7 @@
                 if (this.recuadrosActuales.length < this.totalRangos) return alert(`Dibuja los ${this.totalRangos} recuadros requeridos.`);
 
                 const foto = this.listaImagenes[this.indiceActual];
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Procesando con OpenCV y Tesseract...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Aplicando OpenCV y ejecutando OCR...";
 
                 const scaleX = this.mediaElement.naturalWidth / this.mediaElement.width;
                 const scaleY = this.mediaElement.naturalHeight / this.mediaElement.height;
@@ -711,8 +725,10 @@
                         resultados[i] = await new Promise(resolve => {
                             imgObj.onload = async () => {
                                 ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                                // APLICANDO OPENCV
-                                let processedDataUrl = this.procesarConOpenCV(canvas);
+                                
+                                // APLICANDO FILTROS OPENCV INDEPENDIENTES
+                                let processedDataUrl = this.aplicarMejorasOpenCV(canvas);
+                                
                                 let ret = await worker.recognize(processedDataUrl);
                                 resolve(ret.data.text.trim().replace(/\s+/g, ' '));
                             };
@@ -737,9 +753,9 @@
 
             async ejecutarProcesoCamara() {
                 if (this.recuadrosActuales.length < this.totalRangos) return alert(`Dibuja los ${this.totalRangos} recuadros requeridos.`);
-                if (!this.streamCamara) return alert("Enciende la cámara.");
+                if (!this.streamCamara) return alert("Enciende la cámara primero.");
 
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando frame con OpenCV...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Procesando frame con OpenCV y Tesseract...";
                 const videoEl = document.getElementById(`cam-video`);
                 const scaleX = (videoEl.videoWidth || 1280) / videoEl.clientWidth;
                 const scaleY = (videoEl.videoHeight || 720) / videoEl.clientHeight;
@@ -756,8 +772,9 @@
                         let ctx = canvas.getContext('2d');
                         ctx.drawImage(videoEl, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
 
-                        // APLICANDO OPENCV
-                        let processedDataUrl = this.procesarConOpenCV(canvas);
+                        // APLICANDO FILTROS OPENCV INDEPENDIENTES
+                        let processedDataUrl = this.aplicarMejorasOpenCV(canvas);
+
                         let ret = await worker.recognize(processedDataUrl);
                         resultados[i] = ret.data.text.trim().replace(/\s+/g, ' ');
                         document.getElementById(`rango-${this.id}-${i+1}`).value = resultados[i];
@@ -770,7 +787,7 @@
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ Captura de cámara procesada con éxito.";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ Captura de cámara procesada.";
                 } catch (e) { console.error(e); }
             }
 
