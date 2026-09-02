@@ -260,7 +260,7 @@
 
       
     <!-- PESTAÑA 2 -->
-    <div id="tab-2" class="tab-content active">
+    <div id="tab-2" class="tab-content">
         <div class="config-section">
             <label for="num-rangos-2">Recuadros OCR:</label>
             <input type="number" id="num-rangos-2" min="1" max="20" value="4" onchange="appCamara.actualizarCantidadRangos()">
@@ -1071,9 +1071,6 @@
             appCamara.init();
         }
 
-        // Código de integración: El canvas procesa los fotogramas en tiempo real combinando el flujo de video y OpenCV.js
-    // (Nota: appCamara se encargará de gestionar el flujo completo de la interfaz con los recuadros y Tesseract/OpenCV).
-    console.log("Estructura base combinada cargada correctamente.");
     </script>
 </body>
 </html>
