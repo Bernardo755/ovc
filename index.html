@@ -252,14 +252,14 @@
                             <input type="range" id="input-contraste-${this.id}" min="20" max="250" value="100" style="width:100%; cursor:pointer;">
                         </div>
 
-                        <!-- 2. BLOQUE: HERRAMIENTAS OPENCV AMPLIADAS -->
+                        <!-- 2. BLOQUE: HERRAMIENTAS OPENCV FORZADAS A NINGUNO -->
                         <div class="section-box" style="border-color: #4a90e2;">
                             <h4><i class="fas fa-microchip"></i> Herramienta OpenCV Activa</h4>
                             <label style="font-size: 11px; color: #aaa; margin-bottom: 4px; display: block;">Selecciona el filtro a aplicar:</label>
                             <select id="select-cv-tool-${this.id}">
                                 <option value="ninguno">Ninguno (Original)</option>
                                 <option value="gris">1. Escala de Grises</option>
-                                <option value="otsu" selected>2. Binarización Umbral Otsu</option>
+                                <option value="otsu">2. Binarización Umbral Otsu</option>
                                 <option value="adaptive">3. Umbral Adaptativo (Gaussian)</option>
                                 <option value="denoise">4. Reducción de Ruido (Bilateral)</option>
                                 <option value="blur">5. Desenfoque Gaussiano</option>
@@ -318,6 +318,10 @@
             }
 
             configurarControlesBasicos() {
+                // Forzar explícitamente que la lista desplegable inicie en 'ninguno'
+                const selectTool = document.getElementById(`select-cv-tool-${this.id}`);
+                if (selectTool) selectTool.value = 'ninguno';
+
                 if (!this.esCamara) {
                     document.getElementById(`file-upload-${this.id}`).addEventListener('change', (e) => this.cargarImagenes(e));
                     document.getElementById(`btn-ejecutar-${this.id}`).addEventListener('click', () => this.ejecutarProcesoYpasarSiguiente());
@@ -390,7 +394,6 @@
                 } catch (e) { console.error(e); }
             }
 
-            // PROCESAMIENTO OPENCV AMPLIADO CON NUEVAS HERRAMIENTAS
             procesarConOpenCV(canvasInput) {
                 if (typeof cv === 'undefined' || !cv.Mat) {
                     return canvasInput.toDataURL('image/png');
@@ -506,7 +509,6 @@
                     document.getElementById(`queue-banner-${this.id}`).style.display = 'none';
                 } else {
                     this.apagarCamara();
-                    // Limpia completamente el canvas de la cámara para que no quede la última imagen estática
                     const canvasCam = document.getElementById(`cam-canvas-${this.id}`);
                     if (canvasCam) {
                         const ctx = canvasCam.getContext('2d');
@@ -572,7 +574,6 @@
                 try {
                     this.apagarCamara();
                     
-                    // Asegurar que existan los elementos correctos en el DOM antes de iniciar
                     const wrapper = document.getElementById(`wrapper-${this.id}`);
                     if (!document.getElementById(`cam-canvas-${this.id}`)) {
                         wrapper.innerHTML = `
@@ -770,6 +771,14 @@
 
                 try {
                     const worker = await Tesseract.createWorker('spa+eng');
+                    
+                    let imgObj = new Image();
+                    imgObj.src = foto.src;
+                    await new Promise((resolve, reject) => {
+                        imgObj.onload = resolve;
+                        imgObj.onerror = reject;
+                    });
+
                     for (let i = 0; i < this.totalRangos; i++) {
                         let b = this.recuadrosActuales[i];
                         let w = b.width * scaleX, h = b.height * scaleY;
@@ -778,17 +787,11 @@
                         canvas.width = w; canvas.height = h;
                         let ctx = canvas.getContext('2d');
 
-                        let imgObj = new Image();
-                        imgObj.src = foto.src;
-                        
-                        resultados[i] = await new Promise(resolve => {
-                            imgObj.onload = async () => {
-                                ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                                let processedDataUrl = this.procesarConOpenCV(canvas);
-                                let ret = await worker.recognize(processedDataUrl);
-                                resolve(ret.data.text.trim().replace(/\s+/g, ' '));
-                            };
-                        });
+                        ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
+                        let processedDataUrl = this.procesarConOpenCV(canvas);
+
+                        let ret = await worker.recognize(processedDataUrl);
+                        resultados[i] = ret.data.text.trim().replace(/\s+/g, ' ');
                         document.getElementById(`rango-${this.id}-${i+1}`).value = resultados[i];
                     }
                     await worker.terminate();
