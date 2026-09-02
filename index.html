@@ -294,7 +294,14 @@
                     <button class="btn btn-secondary" onclick="appCamara.resetZoom()" style="margin:0; width:auto; padding: 5px 8px; font-size: 11px;" title="Resetear Zoom">↺ Reset</button>
                 </div>
 
-                <div id="container-2" class="image-scroll-container modo-seleccionar">
+                    </div>
+                </div>
+                <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara con OpenCV.</p>
+            </div>
+
+
+        
+<div id="container-2" class="image-scroll-container modo-seleccionar">
                     <div id="wrapper-2" class="canvas-wrapper">
                         <video id="cam-video" autoplay playsinline muted></video>
                         <canvas id="outputCanvas"></canvas>
@@ -317,11 +324,9 @@
                     <option value="canny">Detección de Bordes (Canny)</option>
                 </select>
             </label>
-                    </div>
-                </div>
-                <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara con OpenCV.</p>
-            </div>
 
+
+        
             <div class="pane">
                 <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
                 <div id="campos-container-2" class="campos-dinamicos-container"></div>
@@ -430,6 +435,8 @@
                 const btnNav = document.getElementById(`btn-modo-nav-${this.id}`);
                 const txtInstruccion = document.getElementById(`modo-instruccion-${this.id}`);
 
+
+            
                 btnSel.classList.remove('active');
                 btnZoom.classList.remove('active');
                 btnNav.classList.remove('active');
@@ -448,6 +455,7 @@
                     txtInstruccion.innerText = "💡 Modo actual: Haz clic y arrastra para moverte libremente.";
                 }
             }
+
 
             actualizarCantidadRangos() {
                 let val = parseInt(document.getElementById(`num-rangos-${this.id}`).value);
@@ -1069,6 +1077,54 @@
             appFotos.init();
             appCamara.init();
         }
+
+
+        procesarFrame() {
+        if (!this.streaming) return;
+
+        let ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        
+        if (this.canvas.width !== this.video.videoWidth && this.video.videoWidth > 0) {
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+        }
+
+        ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+        if (typeof cv !== 'undefined' && cv.Mat) {
+            try {
+                let src = cv.imread(this.canvas);
+                let dst = new cv.Mat();
+                let tipoFiltro = this.filtroSelect.value;
+                let brightness = parseInt(this.brightnessInput.value);
+                let contrast = parseFloat(this.contrastInput.value);
+
+                src.convertTo(src, -1, contrast, brightness);
+
+                if (tipoFiltro === 'gris') {
+                    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+                    cv.imshow(this.canvas, dst);
+                } else if (tipoFiltro === 'canny') {
+                    let gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                    cv.Canny(gray, dst, 50, 150);
+                    cv.imshow(this.canvas, dst);
+                    gray.delete();
+                } else {
+                    cv.imshow(this.canvas, src);
+                }
+
+                src.delete();
+                dst.delete();
+            } catch (e) {
+                console.error("Error en procesamiento OpenCV:", e);
+            }
+        }
+
+        if (this.streaming) {
+            requestAnimationFrame(() => this.procesarFrame());
+        }
+    }
 
     </script>
 </body>
