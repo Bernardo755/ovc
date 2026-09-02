@@ -270,24 +270,6 @@
                 <option value="">-- Detectando cámaras... --</option>
             </select>
 
-            <div class="slider-group">
-                <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
-                <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
-            </div>
-
-            <div class="slider-group">
-                <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
-                <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
-            </div>
-
-            <label>Filtro OpenCV: 
-                <select id="filtro">
-                    <option value="normal">Normal (Con Ajustes de Luz)</option>
-                    <option value="gris">Escala de Grises</option>
-                    <option value="canny">Detección de Bordes (Canny)</option>
-                </select>
-            </label>
-
             <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
         </div>
 
@@ -318,6 +300,23 @@
                         <canvas id="outputCanvas"></canvas>
                         <div id="sel-box-2" class="selection-box"></div>
                         <div id="zoom-box-2" class="zoom-selection-box"></div>
+                        <div class="slider-group">
+                <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
+                <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
+            </div>
+
+            <div class="slider-group">
+                <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
+                <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
+            </div>
+
+            <label>Filtro OpenCV: 
+                <select id="filtro">
+                    <option value="normal">Normal (Con Ajustes de Luz)</option>
+                    <option value="gris">Escala de Grises</option>
+                    <option value="canny">Detección de Bordes (Canny)</option>
+                </select>
+            </label>
                     </div>
                 </div>
                 <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara con OpenCV.</p>
