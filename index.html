@@ -3,253 +3,449 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor OCR - Fotos y Cámara</title>
-    <!-- Librerías necesarias -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <title>Extractor OCR Inteligente</title>
+    
+    <!-- Tesseract y SheetJS -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
-        .app-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .canvas-container { position: relative; overflow: hidden; border: 2px solid #ccc; background: #222; width: 100%; height: 500px; cursor: crosshair; margin-bottom: 15px; }
-        .wrapper { transform-origin: 0 0; position: absolute; }
-        .preview-img { display: block; max-width: none; }
-        video { display: block; max-width: none; }
-        .selection-box { position: absolute; border: 2px dashed #00ff00; background: rgba(0, 255, 0, 0.2); display: none; pointer-events: none; }
-        .zoom-selection-box { position: absolute; border: 2px dashed #00bfff; background: rgba(0, 191, 255, 0.2); display: none; pointer-events: none; }
-        .saved-box { position: absolute; border: 2px solid #ff0000; background: rgba(255, 0, 0, 0.2); color: white; font-weight: bold; font-size: 12px; pointer-events: none; display: flex; align-items: flex-start; justify-content: flex-start; padding: 2px; }
-        .controls, .form-inputs { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-        button, select, input[type="file"], input[type="text"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-        button { background-color: #007bff; color: white; cursor: pointer; border: none; }
-        button:hover { background-color: #0056b3; }
-        button.danger { background-color: #dc3545; }
-        button.danger:hover { background-color: #c82333; }
-        .status-bar { padding: 10px; background: #e9ecef; border-radius: 4px; font-weight: bold; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-bg: #2d2d2d;
+            --text-color: #f0f0f0;
+            --accent: #4a90e2;
+            --accent-hover: #357abd;
+            --border: #444;
+            --success: #28a745;
+            --danger: #dc3545;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            background: #111;
+            padding: 10px 20px 0;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab-btn {
+            background: var(--panel-bg);
+            color: #aaa;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px 8px 0 0;
+            margin-right: 5px;
+            transition: 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            height: calc(100vh - 50px);
+        }
+
+        .tab-content.active { display: flex; }
+
+        .app-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+            position: relative;
+        }
+
+        .media-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: crosshair;
+        }
+
+        .media-wrapper {
+            position: relative;
+            transform-origin: 0 0;
+        }
+
+        .preview-img, video {
+            display: block;
+            max-width: none;
+            pointer-events: none;
+        }
+
+        /* Estilos de los recuadros */
+        .selection-box {
+            position: absolute; border: 2px dashed #ffeb3b; background: rgba(255, 235, 59, 0.2);
+            pointer-events: none; display: none; z-index: 10;
+        }
+        .zoom-selection-box {
+            position: absolute; border: 2px dashed #00bcd4; background: rgba(0, 188, 212, 0.2);
+            pointer-events: none; display: none; z-index: 10;
+        }
+        .saved-box {
+            position: absolute; border: 2px solid #4caf50; background: rgba(76, 175, 80, 0.2);
+            pointer-events: none; z-index: 5; display: flex; justify-content: center; align-items: center;
+            color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000;
+        }
+
+        /* Inputs y Botones */
+        input[type="text"], input[type="file"], select {
+            width: 100%; padding: 10px; background: #111; border: 1px solid var(--border);
+            color: #fff; border-radius: 5px; outline: none; margin-bottom: 5px;
+        }
+
+        .btn {
+            padding: 10px; border: none; border-radius: 5px; cursor: pointer;
+            font-weight: bold; width: 100%; transition: 0.2s; color: #fff;
+            display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--accent); }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
+        
+        .toolbar {
+            display: flex; gap: 5px; background: #1a1a1a; padding: 10px; border-bottom: 1px solid var(--border);
+        }
+        .toolbar .btn { width: auto; padding: 8px 15px; font-size: 14px; background: #333;}
+        .toolbar .btn.active { background: var(--accent); }
+
+        .table-container {
+            height: 250px; background: var(--panel-bg); overflow: auto; border-top: 1px solid var(--border);
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
+        th { background: #111; position: sticky; top: 0; }
+
+        .status-bar {
+            background: #111; padding: 8px 15px; font-size: 13px; color: #4caf50; font-weight: bold;
+        }
+
+        .filters-container {
+            background: #222; padding: 12px; border-radius: 8px; border: 1px solid #444;
+        }
+        .filters-container input[type="range"] { width: 100%; margin: 5px 0 10px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <!-- SECCIÓN 1: LOTE DE FOTOS -->
-    <div class="app-container" id="app-1">
-        <h2>📁 Modo Lote de Fotos</h2>
-        
-        <div class="controls">
-            <input type="file" id="file-input-1" multiple accept="image/*" onchange="appFotos.cargarImagenes(event)">
-            <button onclick="appFotos.cambiarModo('seleccionar')">🎯 Modo Selección</button>
-            <button onclick="appFotos.cambiarModo('navegar')">✋ Modo Navegar</button>
-            <button onclick="appFotos.cambiarModo('zoom-area')">🔍 Zoom Área</button>
-            <button onclick="appFotos.resetZoom()">🔄 Reset Zoom</button>
-            <button onclick="appFotos.reiniciarRecuadrosActuales()">🔄 Reubicar Recuadros</button>
-        </div>
-
-        <div class="status-bar" id="queue-banner-1" style="display:none; justify-content: space-between;">
-            <span id="queue-text-1"></span>
-            <span id="current-filename-1"></span>
-        </div>
-        <div id="loading-status-1" class="status-bar">Sube fotos o una carpeta para comenzar.</div>
-
-        <div id="container-1" class="canvas-container">
-            <div id="wrapper-1" class="wrapper">
-                <span style="color: #fff; padding: 20px; display: block;">Sin imágenes cargadas</span>
-                <div id="sel-box-1" class="selection-box"></div>
-                <div id="zoom-box-1" class="zoom-selection-box"></div>
-            </div>
-        </div>
-
-        <div class="form-inputs">
-            <label>R0 (ID / Ref): <input type="text" id="rango-1-0"></label>
-            <label>R1: <input type="text" id="rango-1-1" readonly></label>
-            <label>R2: <input type="text" id="rango-1-2" readonly></label>
-            <label>R3: <input type="text" id="rango-1-3" readonly></label>
-            <span>Recuadro activo a dibujar: <b id="active-box-label-1">1</b></span>
-        </div>
-
-        <div class="controls">
-            <button onclick="appFotos.ejecutarProcesoYpasarSiguiente()" style="background-color: #28a745;">▶️ Procesar OCR y Siguiente</button>
-            <button onclick="appFotos.exportarExcel()" style="background-color: #17a2b8;">💾 Exportar a Excel</button>
-            <button class="danger" onclick="appFotos.limpiarTodoApp()">🗑️ Limpiar Todo</button>
-        </div>
-
-        <table id="tabla-resultados-1">
-            <thead>
-                <tr>
-                    <th>Archivo</th><th>R0</th><th>R1</th><th>R2</th><th>R3</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('tab1')"><i class="fas fa-images"></i> Lote de Fotos</button>
+        <button class="tab-btn" onclick="switchTab('tab2')"><i class="fas fa-camera"></i> Cámara en Vivo</button>
     </div>
 
-    <!-- SECCIÓN 2: CÁMARA WEB -->
-    <div class="app-container" id="app-2">
-        <h2>📷 Modo Cámara Web</h2>
-        
-        <div class="controls">
-            <select id="select-camara">
-                <option value="">Cámara por defecto</option>
-            </select>
-            <button onclick="appCamara.iniciarCamara()">🟢 Iniciar Cámara</button>
-            <button onclick="appCamara.apagarCamara()" class="danger">🔴 Detener Cámara</button>
-            <button onclick="appCamara.cambiarModo('seleccionar')">🎯 Modo Selección</button>
-            <button onclick="appCamara.cambiarModo('navegar')">✋ Modo Navegar</button>
-            <button onclick="appCamara.cambiarModo('zoom-area')">🔍 Zoom Área</button>
-            <button onclick="appCamara.resetZoom()">🔄 Reset Zoom</button>
-            <button onclick="appCamara.reiniciarRecuadrosActuales()">🔄 Reubicar Recuadros</button>
-        </div>
-
-        <div id="loading-status-2" class="status-bar">Cámara apagada. Enciéndela para comenzar.</div>
-
-        <div id="container-2" class="canvas-container">
-            <div id="wrapper-2" class="wrapper">
-                <video id="cam-video" autoplay playsinline style="pointer-events: none;"></video>
-                <div id="sel-box-2" class="selection-box"></div>
-                <div id="zoom-box-2" class="zoom-selection-box"></div>
-            </div>
-        </div>
-
-        <div class="form-inputs">
-            <label>R0 (ID / Ref): <input type="text" id="rango-2-0"></label>
-            <label>R1: <input type="text" id="rango-2-1" readonly></label>
-            <label>R2: <input type="text" id="rango-2-2" readonly></label>
-            <label>R3: <input type="text" id="rango-2-3" readonly></label>
-            <span>Recuadro activo a dibujar: <b id="active-box-label-2">1</b></span>
-        </div>
-
-        <div class="controls">
-            <button onclick="appCamara.ejecutarProcesoCamara()" style="background-color: #28a745;">📸 Capturar y Procesar OCR</button>
-            <button onclick="appCamara.exportarExcel()" style="background-color: #17a2b8;">💾 Exportar a Excel</button>
-            <button class="danger" onclick="appCamara.limpiarTodoApp()">🗑️ Limpiar Todo</button>
-        </div>
-
-        <table id="tabla-resultados-2">
-            <thead>
-                <tr>
-                    <th>Captura / Hora</th><th>R0</th><th>R1</th><th>R2</th><th>R3</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <div id="tab1" class="tab-content active">
+        <div id="app-1" class="app-layout"></div>
+    </div>
+    
+    <div id="tab2" class="tab-content">
+        <div id="app-2" class="app-layout"></div>
     </div>
 
     <script>
-        // PARTE 1 Y PARTE 2 INTEGRADAS EN LA CLASE
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
         class ExtractorOCRApp {
             constructor(id, esCamara) {
                 this.id = id;
                 this.esCamara = esCamara;
-                
-                // Configuración
-                this.totalRangos = 3; 
+                this.totalRangos = 3; // 3 recuadros OCR
                 this.tablaData = [];
                 this.recuadrosActuales = [];
-                this.listaImagenes = [];
-                this.indiceActual = 0;
-                
-                // Elementos multimedia y de transformación
-                this.mediaElement = null;
-                this.streamCamara = null;
+                this.modoActual = 'seleccionar';
                 this.scale = 1;
                 this.panX = 0;
                 this.panY = 0;
-                
-                // Estados de interacción
                 this.isDrawing = false;
                 this.isDraggingImage = false;
-                this.startX = 0;
-                this.startY = 0;
-                this.startPanX = 0;
-                this.startPanY = 0;
-                this.modoActual = 'seleccionar';
+                this.mediaElement = null;
+                this.streamCamara = null;
+                this.currentFilter = '';
+
+                // Para Lotes de Fotos
+                this.listaImagenes = [];
+                this.indiceActual = 0;
             }
 
             init() {
-                this.actualizarUIformulario();
+                this.setupHTML();
+                this.configurarControlesBasicos();
                 if (this.esCamara) {
-                    this.obtenerDispositivosCamara();
+                    this.poblarCamaras();
                 }
             }
 
-            async obtenerDispositivosCamara() {
+            setupHTML() {
+                const appContainer = document.getElementById(`app-${this.id}`);
+                
+                let inputArea = '';
+                if (!this.esCamara) {
+                    inputArea = `
+                        <label>Subir Imágenes o Carpeta:</label>
+                        <input type="file" id="file-upload-${this.id}" multiple accept="image/*">
+                        <div id="queue-banner-${this.id}" style="display:none; background:#333; padding:10px; border-radius:5px; margin-bottom:10px; text-align:center;">
+                            <span id="queue-text-${this.id}" style="font-weight:bold; color:var(--accent);"></span><br>
+                            <span id="current-filename-${this.id}" style="font-size:12px; color:#aaa;"></span>
+                        </div>
+                    `;
+                } else {
+                    inputArea = `
+                        <label>Seleccionar Cámara:</label>
+                        <select id="select-camara"></select>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn btn-primary" id="btn-iniciar-cam-${this.id}"><i class="fas fa-play"></i> Iniciar</button>
+                            <button class="btn btn-danger" id="btn-apagar-cam-${this.id}"><i class="fas fa-stop"></i> Apagar</button>
+                        </div>
+                    `;
+                }
+
+                appContainer.innerHTML = `
+                    <div class="sidebar">
+                        ${inputArea}
+                        
+                        <div class="filters-container">
+                            <h4 style="margin: 0 0 10px 0; font-size: 14px; color:#ddd;"><i class="fas fa-sliders-h"></i> Ajustes Pre-OCR</h4>
+                            <label style="font-size: 12px;">Brillo: <span id="val-brillo-${this.id}">100</span>%</label>
+                            <input type="range" id="input-brillo-${this.id}" min="30" max="250" value="100">
+                            
+                            <label style="font-size: 12px;">Contraste: <span id="val-contraste-${this.id}">100</span>%</label>
+                            <input type="range" id="input-contraste-${this.id}" min="30" max="250" value="100">
+                            
+                            <label style="font-size: 12px; display:flex; align-items:center; cursor:pointer;">
+                                <input type="checkbox" id="input-bn-${this.id}" style="margin-right:5px; cursor:pointer;"> Binarizar (Blanco y Negro)
+                            </label>
+                        </div>
+
+                        <div>
+                            <label style="color:#ffeb3b;"><i class="fas fa-keyboard"></i> R0 (Referencia Manual):</label>
+                            <input type="text" id="rango-${this.id}-0" placeholder="Escribe el n° de referencia...">
+                        </div>
+                        
+                        <div style="background:#222; padding:10px; border-radius:5px; border:1px solid #444;">
+                            <h4 style="margin-bottom:10px; font-size:13px; text-align:center;">Resultados OCR</h4>
+                            ${[1, 2, 3].map(i => `
+                                <div style="margin-bottom:8px;">
+                                    <label style="font-size:12px; color:#aaa;">Rango ${i}:</label>
+                                    <input type="text" id="rango-${this.id}-${i}" readonly style="background:#1a1a1a; color:#4caf50; font-weight:bold;">
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <button id="btn-ejecutar-${this.id}" class="btn btn-success"><i class="fas fa-bolt"></i> Ejecutar OCR</button>
+                        <button id="btn-reubicar-${this.id}" class="btn" style="background:#e67e22;"><i class="fas fa-sync-alt"></i> Redibujar Recuadros</button>
+                        <button id="btn-exportar-${this.id}" class="btn btn-primary"><i class="fas fa-file-excel"></i> Exportar a Excel</button>
+                        <button id="btn-limpiar-${this.id}" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Limpiar Todo</button>
+                    </div>
+                    
+                    <div class="main-content">
+                        <div class="toolbar">
+                            <button class="btn active" id="mode-sel-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('seleccionar')"><i class="fas fa-vector-square"></i> Dibujar (R<span id="active-box-label-${this.id}">1</span>)</button>
+                            <button class="btn" id="mode-nav-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('navegar')"><i class="fas fa-hand-paper"></i> Navegar</button>
+                            <button class="btn" id="mode-zoom-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('zoom-area')"><i class="fas fa-search-plus"></i> Zoom Área</button>
+                            <button class="btn" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.resetZoom()"><i class="fas fa-expand"></i> Reset Visión</button>
+                        </div>
+
+                        <div class="media-container" id="container-${this.id}">
+                            <div class="media-wrapper" id="wrapper-${this.id}">
+                                ${this.esCamara 
+                                    ? `<video id="cam-video" autoplay playsinline></video>
+                                       <div id="sel-box-${this.id}" class="selection-box"></div>
+                                       <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>` 
+                                    : `<span style="color: #666; padding: 20px; display: block;">Sube imágenes para comenzar</span>
+                                       <div id="sel-box-${this.id}" class="selection-box"></div>
+                                       <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>`
+                                }
+                            </div>
+                        </div>
+
+                        <div class="status-bar" id="loading-status-${this.id}">
+                            Esperando acción del usuario...
+                        </div>
+
+                        <div class="table-container">
+                            <table id="tabla-${this.id}">
+                                <thead>
+                                    <tr>
+                                        <th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th>
+                                        <th>R0 (Manual)</th>
+                                        <th>R1</th>
+                                        <th>R2</th>
+                                        <th>R3</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            configurarControlesBasicos() {
+                if (!this.esCamara) {
+                    document.getElementById(`file-upload-${this.id}`).addEventListener('change', (e) => this.cargarImagenes(e));
+                    document.getElementById(`btn-ejecutar-${this.id}`).addEventListener('click', () => this.ejecutarProcesoYpasarSiguiente());
+                } else {
+                    document.getElementById(`btn-iniciar-cam-${this.id}`).addEventListener('click', () => this.iniciarCamara());
+                    document.getElementById(`btn-apagar-cam-${this.id}`).addEventListener('click', () => this.apagarCamara());
+                    document.getElementById(`btn-ejecutar-${this.id}`).addEventListener('click', () => this.ejecutarProcesoCamara());
+                }
+
+                document.getElementById(`btn-reubicar-${this.id}`).addEventListener('click', () => this.reiniciarRecuadrosActuales());
+                document.getElementById(`btn-exportar-${this.id}`).addEventListener('click', () => this.exportarExcel());
+                document.getElementById(`btn-limpiar-${this.id}`).addEventListener('click', () => this.limpiarTodoApp());
+
+                // Configurar Filtros (Canvas + CSS)
+                ['input-brillo-', 'input-contraste-', 'input-bn-'].forEach(prefix => {
+                    const el = document.getElementById(`${prefix}${this.id}`);
+                    if(el) {
+                        el.addEventListener('input', () => this.aplicarFiltrosUI());
+                    }
+                });
+            }
+
+            async poblarCamaras() {
                 try {
                     const devices = await navigator.mediaDevices.enumerateDevices();
-                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    const videoDevices = devices.filter(d => d.kind === 'videoinput');
                     const select = document.getElementById('select-camara');
-                    videoDevices.forEach(device => {
-                        const option = document.createElement('option');
-                        option.value = device.deviceId;
-                        option.text = device.label || `Cámara ${select.length + 1}`;
-                        select.appendChild(option);
-                    });
-                } catch (error) {
-                    console.error("Error obteniendo cámaras:", error);
+                    select.innerHTML = videoDevices.map(d => `<option value="${d.deviceId}">${d.label || 'Cámara'}</option>`).join('');
+                } catch (e) {
+                    console.error("Error al leer cámaras:", e);
+                }
+            }
+
+            aplicarFiltrosUI() {
+                const brillo = document.getElementById(`input-brillo-${this.id}`).value;
+                const contraste = document.getElementById(`input-contraste-${this.id}`).value;
+                const bn = document.getElementById(`input-bn-${this.id}`).checked;
+
+                document.getElementById(`val-brillo-${this.id}`).innerText = brillo;
+                document.getElementById(`val-contraste-${this.id}`).innerText = contraste;
+
+                // Generamos la cadena del filtro
+                this.currentFilter = `brightness(${brillo}%) contrast(${contraste}%) ${bn ? 'grayscale(100%)' : ''}`;
+
+                // Aplicar visualmente en vivo
+                if (this.mediaElement) {
+                    this.mediaElement.style.filter = this.currentFilter;
                 }
             }
 
             cambiarModo(modo) {
                 this.modoActual = modo;
+                document.getElementById(`mode-sel-${this.id}`).classList.remove('active');
+                document.getElementById(`mode-nav-${this.id}`).classList.remove('active');
+                document.getElementById(`mode-zoom-${this.id}`).classList.remove('active');
+                
+                let btnId = modo === 'seleccionar' ? `mode-sel-${this.id}` : (modo === 'navegar' ? `mode-nav-${this.id}` : `mode-zoom-${this.id}`);
+                document.getElementById(btnId).classList.add('active');
+
                 const container = document.getElementById(`container-${this.id}`);
                 if (modo === 'navegar') {
                     container.style.cursor = 'grab';
+                } else if (modo === 'zoom-area') {
+                    container.style.cursor = 'zoom-in';
                 } else {
                     container.style.cursor = 'crosshair';
                 }
             }
 
-            limpiarVisualesRecuadros() {
-                const wrapper = document.getElementById(`wrapper-${this.id}`);
-                const boxes = wrapper.querySelectorAll('.saved-box');
-                boxes.forEach(box => box.remove());
+            renderizarTablaHTML() {
+                const tbody = document.querySelector(`#tabla-${this.id} tbody`);
+                tbody.innerHTML = '';
+                this.tablaData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const key1 = this.esCamara ? 'Captura / Hora' : 'Archivo';
+                    tr.innerHTML = `
+                        <td>${row[key1] || ''}</td>
+                        <td>${row['R0'] || ''}</td>
+                        <td>${row['R1'] || ''}</td>
+                        <td>${row['R2'] || ''}</td>
+                        <td>${row['R3'] || ''}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                const container = tbody.parentElement.parentElement;
+                container.scrollTop = container.scrollHeight;
             }
 
             redibujarRecuadrosEnPantalla() {
                 this.limpiarVisualesRecuadros();
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
-                this.recuadrosActuales.forEach((boxData, i) => {
+                this.recuadrosActuales.forEach((b, index) => {
                     const permBox = document.createElement('div');
                     permBox.className = 'saved-box';
-                    permBox.style.left = boxData.left + 'px';
-                    permBox.style.top = boxData.top + 'px';
-                    permBox.style.width = boxData.width + 'px';
-                    permBox.style.height = boxData.height + 'px';
-                    permBox.innerHTML = `<span>R${i + 1}</span>`;
+                    permBox.style.left = b.left + 'px';
+                    permBox.style.top = b.top + 'px';
+                    permBox.style.width = b.width + 'px';
+                    permBox.style.height = b.height + 'px';
+                    permBox.innerHTML = `<span>R${index + 1}</span>`;
                     wrapper.appendChild(permBox);
                 });
             }
 
-            renderizarTablaHTML() {
-                const tbody = document.querySelector(`#tabla-resultados-${this.id} tbody`);
-                tbody.innerHTML = '';
-                this.tablaData.forEach(row => {
-                    const tr = document.createElement('tr');
-                    
-                    const tdArchivo = document.createElement('td');
-                    tdArchivo.innerText = row["Archivo"] || row["Captura / Hora"];
-                    tr.appendChild(tdArchivo);
-                    
-                    const tdR0 = document.createElement('td');
-                    tdR0.innerText = row["R0"] || '';
-                    tr.appendChild(tdR0);
-                    
-                    for (let i = 1; i <= this.totalRangos; i++) {
-                        const td = document.createElement('td');
-                        td.innerText = row[`R${i}`] || '';
-                        tr.appendChild(td);
-                    }
-                    tbody.appendChild(tr);
-                });
+            limpiarVisualesRecuadros() {
+                const wrapper = document.getElementById(`wrapper-${this.id}`);
+                if (wrapper) {
+                    const boxes = wrapper.querySelectorAll('.saved-box');
+                    boxes.forEach(box => box.remove());
+                }
             }
 
-            // ==========================================
-            // CÓDIGO PROPORCIONADO POR EL USUARIO (PARTE 2)
-            // ==========================================
+            // --- CÓDIGO INCORPORADO DE LA PARTE 2 ---
+
             limpiarTodoApp() {
                 if (!confirm("¿Estás seguro de que deseas limpiar todo (tabla, imágenes y recuadros guardados)?")) return;
 
                 this.tablaData = [];
                 this.renderizarTablaHTML();
                 this.recuadrosActuales = [];
+                this.reiniciarRecuadrosActuales();
 
                 if (!this.esCamara) {
                     this.listaImagenes = [];
@@ -263,11 +459,7 @@
                     document.getElementById(`loading-status-${this.id}`).innerText = "Cámara apagada y datos limpiados.";
                 }
 
-                for(let i=0; i<=this.totalRangos; i++) {
-                    const input = document.getElementById(`rango-${this.id}-${i}`);
-                    if(input) input.value = '';
-                }
-                this.actualizarUIformulario();
+                document.getElementById(`rango-${this.id}-0`).value = '';
             }
 
             cargarImagenes(event) {
@@ -298,7 +490,6 @@
 
             mostrarFotoActual() {
                 if (this.listaImagenes.length === 0) return;
-
                 if (this.indiceActual >= this.listaImagenes.length) {
                     this.indiceActual = this.listaImagenes.length - 1;
                 }
@@ -312,11 +503,12 @@
                     <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
                 `;
 
-                document.getElementById(`queue-banner-${this.id}`).style.display = 'flex';
+                document.getElementById(`queue-banner-${this.id}`).style.display = 'block';
                 document.getElementById(`queue-text-${this.id}`).innerText = `Foto ${this.indiceActual + 1} de ${this.listaImagenes.length}`;
                 document.getElementById(`current-filename-${this.id}`).innerText = `📁 ${foto.name}`;
 
                 this.mediaElement = document.getElementById(`preview-img-${this.id}`);
+                this.aplicarFiltrosUI(); // Aplica filtros guardados a la nueva imagen
 
                 this.mediaElement.onload = () => {
                     this.resetZoom();
@@ -345,6 +537,7 @@
                     this.streamCamara = await navigator.mediaDevices.getUserMedia(constraints);
                     this.mediaElement = document.getElementById(`cam-video`);
                     this.mediaElement.srcObject = this.streamCamara;
+                    this.aplicarFiltrosUI(); // Aplica filtros al video
                     
                     this.resetZoom();
                     this.configurarInteraccionCanvas();
@@ -424,7 +617,6 @@
                             this.isDraggingImage = true;
                             this.startPanX = e.clientX - this.panX;
                             this.startPanY = e.clientY - this.panY;
-                            
                             document.addEventListener('mousemove', onMouseMoveGlobal);
                             document.addEventListener('mouseup', onMouseUpGlobal);
                             e.preventDefault();
@@ -544,7 +736,7 @@
                         if (this.recuadrosActuales.length < this.totalRangos) {
                             document.getElementById(`loading-status-${this.id}`).innerText = `✅ Rango ${this.recuadrosActuales.length} guardado. Falta(n) ${this.totalRangos - this.recuadrosActuales.length}.`;
                         } else {
-                            document.getElementById(`loading-status-${this.id}`).innerText = `🎉 ¡${this.totalRangos} recuadros guardados! Listos para procesar.`;
+                            document.getElementById(`loading-status-${this.id}`).innerText = `🎉 ¡${this.totalRangos} recuadros guardados! Listos para escanear.`;
                         }
                     }
                 };
@@ -552,7 +744,8 @@
 
             actualizarUIformulario() {
                 const siguienteRango = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
-                document.getElementById(`active-box-label-${this.id}`).innerText = siguienteRango;
+                const el = document.getElementById(`active-box-label-${this.id}`);
+                if(el) el.innerText = siguienteRango;
             }
 
             reiniciarRecuadrosActuales() {
@@ -573,17 +766,16 @@
 
             async ejecutarProcesoYpasarSiguiente() {
                 if (this.listaImagenes.length === 0) {
-                    alert("No hay imágenes cargadas."); return;
+                    alert("No hay imágenes cargadas.");
+                    return;
                 }
                 if (this.recuadrosActuales.length < this.totalRangos) {
-                    alert(`Debes terminar de dibujar los ${this.totalRangos} recuadros.`); return;
-                }
-                if (this.indiceActual >= this.listaImagenes.length) {
-                    this.indiceActual = 0;
+                    alert(`Dibuja los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
+                    return;
                 }
 
                 const foto = this.listaImagenes[this.indiceActual];
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Ejecutando OCR en los recuadros...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Ejecutando OCR en la imagen con los ajustes...";
 
                 const scaleX = this.mediaElement.naturalWidth / this.mediaElement.width;
                 const scaleY = this.mediaElement.naturalHeight / this.mediaElement.height;
@@ -594,28 +786,28 @@
 
                     for (let i = 0; i < this.totalRangos; i++) {
                         const b = this.recuadrosActuales[i];
-                        const x = b.left * scaleX;
-                        const y = b.top * scaleY;
                         const w = b.width * scaleX;
                         const h = b.height * scaleY;
-
+                        
                         const canvas = document.createElement('canvas');
-                        canvas.width = w; canvas.height = h;
+                        canvas.width = w;
+                        canvas.height = h;
                         const ctx = canvas.getContext('2d');
+
+                        // ¡Aplicamos la mejora de imagen nativa antes del OCR!
+                        if(this.currentFilter) {
+                            ctx.filter = this.currentFilter;
+                        }
 
                         const imageObj = new Image();
                         imageObj.src = foto.src;
                         
                         const textoRecorte = await new Promise((resolve) => {
                             imageObj.onload = async () => {
-                                ctx.drawImage(imageObj, x, y, w, h, 0, 0, w, h);
+                                ctx.drawImage(imageObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
                                 const croppedDataUrl = canvas.toDataURL('image/png');
                                 const ret = await worker.recognize(croppedDataUrl);
-                                let texto = ret.data.text.trim();
-                                
-                                texto = texto.replace(/\s*@\s*/g, '@');
-                                texto = texto.replace(/\s*\.\s*/g, '.');
-                                texto = texto.replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
+                                let texto = ret.data.text.trim().replace(/\s*@\s*/g, '@').replace(/\s*\.\s*/g, '.').replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
                                 resolve(texto);
                             };
                         });
@@ -628,16 +820,14 @@
 
                     const valR0 = document.getElementById(`rango-${this.id}-0`).value.trim();
                     let rowData = { "Archivo": foto.name, "R0": valR0 };
-                    for (let i = 0; i < this.totalRangos; i++) {
-                        rowData[`R${i+1}`] = resultadosOCR[i];
-                    }
+                    for (let i = 0; i < this.totalRangos; i++) { rowData[`R${i+1}`] = resultadosOCR[i]; }
                     this.tablaData.push(rowData);
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
                     document.getElementById(`rango-${this.id}-0`).focus();
 
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ OCR Exitoso. Pasando a la siguiente...";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR Completado! Pasando a la siguiente...";
 
                     setTimeout(() => {
                         this.indiceActual++;
@@ -651,29 +841,25 @@
 
                 } catch (err) {
                     console.error(err);
-                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al ejecutar el OCR.";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al ejecutar el OCR masivo.";
                 }
             }
 
             async ejecutarProcesoCamara() {
                 if (this.recuadrosActuales.length < this.totalRangos) {
-                    alert(`Debes terminar de dibujar los ${this.totalRangos} recuadros.`); return;
+                    alert(`Dibuja los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
+                    return;
                 }
                 if (!this.streamCamara) {
-                    alert("La cámara no está encendida."); return;
+                    alert("La cámara no está encendida.");
+                    return;
                 }
 
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando y procesando...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando y mejorando fotograma...";
 
                 const videoEl = document.getElementById(`cam-video`);
-                const natW = videoEl.videoWidth || 1280;
-                const natH = videoEl.videoHeight || 720;
-                const clientW = videoEl.clientWidth;
-                const clientH = videoEl.clientHeight;
-
-                const scaleX = natW / clientW;
-                const scaleY = natH / clientH;
-
+                const scaleX = (videoEl.videoWidth || 1280) / videoEl.clientWidth;
+                const scaleY = (videoEl.videoHeight || 720) / videoEl.clientHeight;
                 let resultadosOCR = new Array(this.totalRangos).fill('');
 
                 try {
@@ -681,25 +867,24 @@
 
                     for (let i = 0; i < this.totalRangos; i++) {
                         const b = this.recuadrosActuales[i];
-                        const x = b.left * scaleX;
-                        const y = b.top * scaleY;
                         const w = b.width * scaleX;
                         const h = b.height * scaleY;
 
                         const canvas = document.createElement('canvas');
-                        canvas.width = w; canvas.height = h;
+                        canvas.width = w;
+                        canvas.height = h;
                         const ctx = canvas.getContext('2d');
 
-                        ctx.drawImage(videoEl, x, y, w, h, 0, 0, w, h);
+                        // ¡Aplicamos la mejora de imagen nativa al frame del video antes del OCR!
+                        if(this.currentFilter) {
+                            ctx.filter = this.currentFilter;
+                        }
+
+                        ctx.drawImage(videoEl, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
                         const croppedDataUrl = canvas.toDataURL('image/png');
 
                         const ret = await worker.recognize(croppedDataUrl);
-                        let texto = ret.data.text.trim();
-                        
-                        texto = texto.replace(/\s*@\s*/g, '@');
-                        texto = texto.replace(/\s*\.\s*/g, '.');
-                        texto = texto.replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
-
+                        let texto = ret.data.text.trim().replace(/\s*@\s*/g, '@').replace(/\s*\.\s*/g, '.').replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
                         resultadosOCR[i] = texto;
                         document.getElementById(`rango-${this.id}-${i+1}`).value = texto;
                     }
@@ -710,26 +895,24 @@
                     const timestamp = new Date().toLocaleTimeString();
                     
                     let rowData = { "Captura / Hora": timestamp, "R0": valR0 };
-                    for (let i = 0; i < this.totalRangos; i++) {
-                        rowData[`R${i+1}`] = resultadosOCR[i];
-                    }
+                    for (let i = 0; i < this.totalRangos; i++) { rowData[`R${i+1}`] = resultadosOCR[i]; }
                     this.tablaData.push(rowData);
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
                     document.getElementById(`rango-${this.id}-0`).focus();
 
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ OCR de cámara completado.";
-
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR de cámara completado con mejoras!";
                 } catch (err) {
                     console.error(err);
-                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al procesar cámara.";
+                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al procesar el OCR de la cámara.";
                 }
             }
 
             exportarExcel() {
                 if (this.tablaData.length === 0) {
-                    alert("La tabla está vacía."); return;
+                    alert("La tabla está vacía.");
+                    return;
                 }
                 const worksheet = XLSX.utils.json_to_sheet(this.tablaData);
                 const workbook = XLSX.utils.book_new();
@@ -738,7 +921,7 @@
             }
         }
 
-        // INICIALIZACIÓN
+        // Inicializar Ambas Pestañas
         const appFotos = new ExtractorOCRApp('1', false);
         const appCamara = new ExtractorOCRApp('2', true);
 
