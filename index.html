@@ -1,540 +1,585 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <!-- =========================================================================
+         1. CABECERA Y LIBRERÍAS EXTERNAS (CDN)
+         - Propósito: Cargar los motores externos necesarios para procesar Excel y OCR.
+         - Módulos complementarios: Se enlaza directamente con Tesseract.js (para el 
+           reconocimiento óptico de caracteres) y SheetJS (para exportar los datos a Excel).
+         ========================================================================= -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor OCR Inteligente con OpenCV Avanzado</title>
+    <title>Extractor OCR Masivo - Rango 0 y Selector de Cámara (Con Memoria de Recuadros)</title>
     
-    <!-- Tesseract, SheetJS y OpenCV.js -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- SheetJS: Manejo y exportación de tablas a archivos Excel (.xlsx) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Tesseract.js: Motor de inteligencia artificial para lectura de texto (OCR) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
-        :root {
-            --bg-color: #1e1e1e;
-            --panel-bg: #2d2d2d;
-            --text-color: #f0f0f0;
-            --accent: #4a90e2;
-            --accent-hover: #357abd;
-            --border: #444;
-            --success: #28a745;
-            --danger: #dc3545;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
+        /* =========================================================================
+           2. ESTILOS CSS GENERALES Y COMPONENTES VISUALES
+           - Propósito: Dar diseño, adaptabilidad (responsive), estética moderna y 
+             control visual de contenedores, tablas, botones y cajas de selección.
+           - Módulos complementarios: Da soporte visual directo a las pestañas, 
+             vistas previas de imágenes, video en vivo de la cámara y las tablas de datos.
+           ========================================================================= */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
         }
-
-        .tabs {
-            display: flex;
-            background: #111;
-            padding: 10px 20px 0;
-            border-bottom: 2px solid var(--border);
+        .container {
+            max-width: 1350px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
+        h1 { color: #2c3e50; text-align: center; margin-top: 0; }
+        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 20px; }
 
+        /* Estilo de pestañas */
+        .tabs-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #bdc3c7;
+            padding-bottom: 10px;
+        }
         .tab-btn {
-            background: var(--panel-bg);
-            color: #aaa;
+            background-color: #ecf0f1;
             border: none;
-            padding: 12px 25px;
-            font-size: 16px;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
             cursor: pointer;
-            border-radius: 8px 8px 0 0;
-            margin-right: 5px;
+            color: #7f8c8d;
             transition: 0.3s;
         }
-
         .tab-btn.active {
-            background: var(--accent);
-            color: #fff;
+            background-color: #3498db;
+            color: white;
         }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
-        .tab-content {
-            display: none;
-            flex: 1;
-            height: calc(100vh - 50px);
-        }
-
-        .tab-content.active { display: flex; }
-
-        .app-layout {
+        .config-section {
+            background: #eaf2f8;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
             display: flex;
-            width: 100%;
-            height: 100%;
-        }
-
-        .sidebar {
-            width: 360px;
-            background: var(--panel-bg);
-            padding: 15px;
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            overflow-y: auto;
-        }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #000;
-            position: relative;
-        }
-
-        .media-container {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
             align-items: center;
-            cursor: crosshair;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .config-section label { font-weight: bold; color: #2980b9; }
+        .config-section input[type="number"], .config-section select {
+            padding: 6px; font-size: 14px; border: 1px solid #bdc3c7; border-radius: 4px; background: white;
+        }
+        .config-section input[type="number"] { width: 70px; text-align: center; }
+        .config-section select { min-width: 220px; }
+
+        .upload-section {
+            display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;
+        }
+        .upload-box {
+            border: 2px dashed #3498db; padding: 15px 25px; text-align: center; border-radius: 8px;
+            background-color: #ecf0f1; cursor: pointer; transition: 0.3s; flex: 1;
+        }
+        .upload-box:hover { background-color: #e2e8f0; }
+
+        .workspace {
+            display: grid; grid-template-columns: 2fr 1fr; gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .workspace { grid-template-columns: 1fr; }
         }
 
-        .media-wrapper {
-            position: relative;
-            transform-origin: 0 0;
+        .pane {
+            background: #fafafa; border: 1px solid #ddd; border-radius: 8px; padding: 15px; position: relative;
         }
+        .pane h3 { margin-top: 0; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 8px; }
 
-        .preview-img, video, canvas.live-preview-canvas {
-            display: block;
-            max-width: none;
-            pointer-events: none;
+        .image-scroll-container {
+            position: relative; width: 100%; height: 550px; overflow: hidden;
+            border: 2px solid #bdc3c7; background: #2c3e50; border-radius: 6px;
         }
+        
+        .image-scroll-container.modo-seleccionar { cursor: crosshair; }
+        .image-scroll-container.modo-zoom-area { cursor: zoom-in; }
+        .image-scroll-container.modo-navegar { cursor: grab; }
+        .image-scroll-container.modo-navegar:active { cursor: grabbing; }
+
+        .canvas-wrapper { position: absolute; transform-origin: 0 0; user-select: none; }
+        .preview-img { display: block; pointer-events: none; }
+
+        #cam-video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
         .selection-box {
-            position: absolute; border: 2px dashed #ffeb3b; background: rgba(255, 235, 59, 0.2);
-            pointer-events: none; display: none; z-index: 10;
+            position: absolute; border: 2px dashed #e74c3c; background: rgba(231, 76, 60, 0.25); display: none; z-index: 10;
         }
         .zoom-selection-box {
-            position: absolute; border: 2px dashed #00bcd4; background: rgba(0, 188, 212, 0.2);
-            pointer-events: none; display: none; z-index: 10;
+            position: absolute; border: 2px dashed #3498db; background: rgba(52, 152, 219, 0.3); display: none; z-index: 15;
         }
         .saved-box {
-            position: absolute; border: 2px solid #4caf50; background: rgba(76, 175, 80, 0.2);
-            pointer-events: none; z-index: 5; display: flex; justify-content: center; align-items: center;
-            color: #fff; font-weight: bold; font-size: 11px; text-shadow: 1px 1px 2px #000;
+            position: absolute; border: 2px solid #2ecc71; background: rgba(46, 204, 113, 0.3); z-index: 5;
+        }
+        .saved-box span {
+            position: absolute; top: -20px; left: 0; background: #2ecc71; color: white;
+            font-size: 10px; padding: 1px 4px; font-weight: bold; border-radius: 3px;
         }
 
-        input[type="text"], input[type="file"], input[type="number"], select {
-            width: 100%; padding: 8px; background: #111; border: 1px solid var(--border);
-            color: #fff; border-radius: 5px; outline: none; margin-bottom: 3px;
+        .queue-info {
+            background: #e8f8f5; border: 1px solid #a3e4d7; padding: 10px; border-radius: 6px;
+            margin-bottom: 15px; font-weight: bold; color: #16a085; display: flex; justify-content: space-between; align-items: center;
+        }
+        .form-group { margin-bottom: 8px; }
+        label { font-weight: bold; display: block; margin-bottom: 2px; font-size: 12px; }
+        input[type="text"] {
+            width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 12px;
         }
 
         .btn {
-            padding: 10px; border: none; border-radius: 5px; cursor: pointer;
-            font-weight: bold; width: 100%; transition: 0.2s; color: #fff;
-            display: flex; justify-content: center; align-items: center; gap: 8px;
+            background-color: #27ae60; color: white; border: none; padding: 10px 15px;
+            font-size: 14px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 8px; transition: 0.2s;
         }
-        .btn-primary { background: var(--accent); }
-        .btn-primary:hover { background: var(--accent-hover); }
-        .btn-success { background: var(--success); }
-        .btn-danger { background: var(--danger); }
+        .btn:hover { background-color: #219653; }
+        .btn-secondary { background-color: #2980b9; }
+        .btn-secondary:hover { background-color: #1f618d; }
+        .btn-warning { background-color: #e67e22; }
+        .btn-warning:hover { background-color: #d35400; }
+        .btn-danger { background-color: #c0392b; }
+        .btn-danger:hover { background-color: #a93226; }
         
-        .toolbar {
-            display: flex; gap: 5px; background: #1a1a1a; padding: 10px; border-bottom: 1px solid var(--border);
-        }
-        .toolbar .btn { width: auto; padding: 8px 15px; font-size: 14px; background: #333;}
-        .toolbar .btn.active { background: var(--accent); }
+        .btn-mode { opacity: 0.6; border: 2px solid transparent; font-size: 11px !important; padding: 5px !important; }
+        .btn-mode.active { opacity: 1; border: 2px solid #fff; box-shadow: 0 0 8px rgba(0,0,0,0.3); }
 
-        .table-container {
-            height: 200px; background: var(--panel-bg); overflow: auto; border-top: 1px solid var(--border);
+        .btn-eliminar-fila {
+            background-color: #e74c3c; color: white; border: none; border-radius: 4px;
+            width: 22px; height: 22px; font-weight: bold; cursor: pointer; display: inline-flex;
+            align-items: center; justify-content: center; font-size: 12px; transition: 0.2s;
         }
+        .btn-eliminar-fila:hover { background-color: #c0392b; }
 
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 8px 12px; border: 1px solid var(--border); text-align: left; }
-        th { background: #111; position: sticky; top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 5px; text-align: left; font-size: 11px; }
+        th { background-color: #f2f2f2; text-align: center; }
+        td:first-child { text-align: center; width: 35px; }
 
-        .status-bar {
-            background: #111; padding: 8px 15px; font-size: 13px; color: #4caf50; font-weight: bold;
-        }
-
-        .section-box {
-            background: #222; padding: 10px; border-radius: 6px; border: 1px solid #444;
-        }
-        .section-box h4 { margin: 0 0 6px 0; font-size: 12px; color: #ddd; display: flex; align-items: center; gap: 6px; }
-        
-        .dynamic-fields-container {
-            max-height: 140px;
-            overflow-y: auto;
-            background: #1a1a1a;
-            padding: 6px;
-            border-radius: 4px;
-            border: 1px solid #333;
+        .loading-status { text-align: center; font-weight: bold; color: #e67e22; margin: 8px 0; font-size: 14px; }
+        .campos-dinamicos-container {
+            max-height: 220px; overflow-y: auto; padding-right: 5px; border: 1px solid #eee;
+            background: #fff; padding: 8px; border-radius: 4px; margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('tab1')"><i class="fas fa-images"></i> Lote de Fotos</button>
-        <button class="tab-btn" onclick="switchTab('tab2')"><i class="fas fa-camera"></i> Cámara en Vivo</button>
+    <div class="container">
+        <h1>📸 Extractor OCR Multimodo (Memoria de Recuadros + Rango 0 + Cámara)</h1>
+        <p class="subtitle">Dibuja tus recuadros una vez; se mantendrán fijos para todas las siguientes fotos hasta que decidas reubicarlos.</p>
+
+        <div class="tabs-nav">
+            <button class="tab-btn active" onclick="cambiarPestaña(1)">📂 Pestaña 1: Lote de Fotos</button>
+            <button class="tab-btn" onclick="cambiarPestaña(2)">📷 Pestaña 2: Cámara en Vivo</button>
+        </div>
+
+        <!-- PESTAÑA 1 -->
+        <div id="tab-1" class="tab-content active">
+            <div class="config-section">
+                <label for="num-rangos-1">Cantidad de recuadros OCR (1 a 20):</label>
+                <input type="number" id="num-rangos-1" min="1" max="20" value="4" onchange="appFotos.actualizarCantidadRangos()">
+                <button class="btn btn-warning" onclick="appFotos.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
+            </div>
+
+            <div class="upload-section">
+                <div class="upload-box" onclick="document.getElementById('file-input').click()">
+                    <p>📂 <strong>Subir Fotos Individuales</strong></p>
+                    <input type="file" id="file-input" accept="image/*" multiple style="display: none;" onchange="appFotos.cargarImagenes(event)">
+                </div>
+                <div class="upload-box" onclick="document.getElementById('folder-input').click()">
+                    <p>📁 <strong>Subir Carpeta Completa de Fotos</strong></p>
+                    <input type="file" id="folder-input" accept="image/*" webkitdirectory directory multiple style="display: none;" onchange="appFotos.cargarImagenes(event)">
+                </div>
+            </div>
+
+            <div class="queue-info" id="queue-banner-1" style="display:none;">
+                <span id="queue-text-1">Foto 1 de 0 en la cola</span>
+                <span id="current-filename-1" style="font-size: 12px; color: #2c3e50;"></span>
+            </div>
+
+            <div class="loading-status" id="loading-status-1">Sube fotos o una carpeta para comenzar.</div>
+
+            <div class="workspace">
+                <div class="pane">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 style="margin:0; border:none;">Imagen (<span id="active-box-label-1">Rango 1</span>/<span id="total-box-label-1">4</span>)</h3>
+                        <button class="btn btn-warning" onclick="appFotos.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Reubicar / Redibujar</button>
+                    </div>
+
+                    <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                        <button id="btn-modo-sel-1" class="btn btn-secondary btn-mode active" onclick="appFotos.cambiarModo('seleccionar')" style="margin:0; flex:1;">✏️ 1. Seleccionar Rango</button>
+                        <button id="btn-modo-zoom-1" class="btn btn-warning btn-mode" onclick="appFotos.cambiarModo('zoom-area')" style="margin:0; flex:1;">🔍 2. Zoom por Área</button>
+                        <button id="btn-modo-nav-1" class="btn btn-secondary btn-mode" onclick="appFotos.cambiarModo('navegar')" style="margin:0; flex:1; background-color: #34495e;">✋ 3. Mover</button>
+                        <button class="btn btn-secondary" onclick="appFotos.resetZoom()" style="margin:0; width:auto; padding: 5px 8px; font-size: 11px;" title="Resetear Zoom">↺ Reset</button>
+                    </div>
+
+                    <div id="container-1" class="image-scroll-container modo-seleccionar">
+                        <div id="wrapper-1" class="canvas-wrapper">
+                            <span style="color: #fff; padding: 20px; display: block;">Sin imágenes cargadas</span>
+                            <div id="sel-box-1" class="selection-box"></div>
+                            <div id="zoom-box-1" class="zoom-selection-box"></div>
+                        </div>
+                    </div>
+                    <p id="modo-instruccion-1" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja tus recuadros una vez. Se guardarán automáticamente para todas las fotos.</p>
+                </div>
+
+                <div class="pane">
+                    <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
+                    <div id="campos-container-1" class="campos-dinamicos-container"></div>
+
+                    <button class="btn" onclick="appFotos.ejecutarProcesoYpasarSiguiente()">⚡ Ejecutar OCR y Siguiente Foto ➡️</button>
+
+                    <h3 style="margin-top: 15px;">3. Tabla Acumulada</h3>
+                    <div style="overflow-x: auto; max-height: 140px;">
+                        <table id="tabla-datos-1">
+                            <thead>
+                                <tr id="tabla-head-1"><th>❌</th><th>Archivo</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button class="btn btn-secondary" onclick="appFotos.exportarExcel()" style="margin:0; flex:1;">📥 Descargar Excel</button>
+                        <button class="btn btn-danger" onclick="appFotos.limpiarTodoApp()" style="margin:0; flex:1;">🗑️ Limpiar Todo</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA 2 -->
+        <div id="tab-2" class="tab-content">
+            <div class="config-section">
+                <label for="num-rangos-2">Recuadros OCR:</label>
+                <input type="number" id="num-rangos-2" min="1" max="20" value="4" onchange="appCamara.actualizarCantidadRangos()">
+                
+                <label for="select-camara">Cámara:</label>
+                <select id="select-camara">
+                    <option value="">-- Detectando cámaras... --</option>
+                </select>
+
+                <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
+            </div>
+
+            <div class="upload-section">
+                <button class="btn btn-secondary" onclick="appCamara.iniciarCamara()" style="margin:0; flex:1;">▶️ Encender Cámara Seleccionada</button>
+                <button class="btn btn-danger" onclick="appCamara.apagarCamara()" style="margin:0; flex:1;">⏹️ Apagar Cámara</button>
+            </div>
+
+            <div class="loading-status" id="loading-status-2">Selecciona una cámara y enciéndela para comenzar.</div>
+
+            <div class="workspace">
+                <div class="pane">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 style="margin:0; border:none;">Proyección (<span id="active-box-label-2">Rango 1</span>/<span id="total-box-label-2">4</span>)</h3>
+                        <button class="btn btn-warning" onclick="appCamara.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Reubicar / Redibujar</button>
+                    </div>
+
+                    <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                        <button id="btn-modo-sel-2" class="btn btn-secondary btn-mode active" onclick="appCamara.cambiarModo('seleccionar')" style="margin:0; flex:1;">✏️ 1. Seleccionar Rango</button>
+                        <button id="btn-modo-zoom-2" class="btn btn-warning btn-mode" onclick="appCamara.cambiarModo('zoom-area')" style="margin:0; flex:1;">🔍 2. Zoom por Área</button>
+                        <button id="btn-modo-nav-2" class="btn btn-secondary btn-mode" onclick="appCamara.cambiarModo('navegar')" style="margin:0; flex:1; background-color: #34495e;">✋ 3. Mover</button>
+                        <button class="btn btn-secondary" onclick="appCamara.resetZoom()" style="margin:0; width:auto; padding: 5px 8px; font-size: 11px;" title="Resetear Zoom">↺ Reset</button>
+                    </div>
+
+                    <div id="container-2" class="image-scroll-container modo-seleccionar">
+                        <div id="wrapper-2" class="canvas-wrapper">
+                            <video id="cam-video" autoplay playsinline muted></video>
+                            <div id="sel-box-2" class="selection-box"></div>
+                            <div id="zoom-box-2" class="zoom-selection-box"></div>
+                        </div>
+                    </div>
+                    <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara.</p>
+                </div>
+
+                <div class="pane">
+                    <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
+                    <div id="campos-container-2" class="campos-dinamicos-container"></div>
+
+                    <button class="btn" onclick="appCamara.ejecutarProcesoCamara()">⚡ Ejecutar OCR de Cámara ➡️</button>
+
+                    <h3 style="margin-top: 15px;">3. Tabla Acumulada</h3>
+                    <div style="overflow-x: auto; max-height: 140px;">
+                        <table id="tabla-datos-2">
+                            <thead>
+                                <tr id="tabla-head-2"><th>❌</th><th>Captura / Hora</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button class="btn btn-secondary" onclick="appCamara.exportarExcel()" style="margin:0; flex:1;">📥 Descargar Excel</button>
+                        <button class="btn btn-danger" onclick="appCamara.limpiarTodoApp()" style="margin:0; flex:1;">🗑️ Limpiar Todo</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="tab1" class="tab-content active"><div id="app-1" class="app-layout"></div></div>
-    <div id="tab2" class="tab-content"><div id="app-2" class="app-layout"></div></div>
-
     <script>
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
+        function cambiarPestaña(num) {
+            document.querySelectorAll('.tab-btn').forEach((btn, index) => {
+                btn.classList.toggle('active', index + 1 === num);
+            });
+            document.querySelectorAll('.tab-content').forEach((content, index) => {
+                content.classList.toggle('active', index + 1 === num);
+            });
+            if (num === 1) {
+                appCamara.apagarCamara();
+            }
         }
 
         class ExtractorOCRApp {
-            constructor(id, esCamara) {
-                this.id = id;
+            constructor(idSufijo, esCamara = false) {
+                this.id = idSufijo;
                 this.esCamara = esCamara;
-                this.totalRangos = 3;
+                this.listaImagenes = [];
+                this.indiceActual = 0;
                 this.tablaData = [];
-                this.recuadrosActuales = [];
+                this.mediaElement = null;
+                
+                this.totalRangos = 4;
+                this.recuadrosActuales = []; // Memoria activa de coordenadas
                 this.modoActual = 'seleccionar';
+
                 this.scale = 1;
                 this.panX = 0;
                 this.panY = 0;
-                this.isDrawing = false;
                 this.isDraggingImage = false;
-                this.mediaElement = null;
+                this.startPanX = 0;
+                this.startPanY = 0;
+                this.isDrawing = false;
+                this.startX = 0;
+                this.startY = 0;
+
                 this.streamCamara = null;
-                this.listaImagenes = [];
-                this.indiceActual = 0;
-                this.animFrameId = null;
             }
 
             init() {
-                this.setupHTML();
-                this.configurarControlesBasicos();
-                if (this.esCamara) this.poblarCamaras();
+                this.actualizarCantidadRangos();
+                if (this.esCamara) {
+                    this.mediaElement = document.getElementById(`cam-video`);
+                    this.configurarInteraccionCanvas();
+                    this.poblarListaCamaras();
+                }
             }
 
-            setupHTML() {
-                const appContainer = document.getElementById(`app-${this.id}`);
-                let inputArea = !this.esCamara 
-                    ? `<label style="font-size:12px;">Subir Imágenes / Carpeta:</label><input type="file" id="file-upload-${this.id}" multiple accept="image/*">
-                       <div id="queue-banner-${this.id}" style="display:none; background:#333; padding:6px; border-radius:4px; text-align:center;">
-                           <span id="queue-text-${this.id}" style="font-weight:bold; color:var(--accent); font-size:12px;"></span><br>
-                           <span id="current-filename-${this.id}" style="font-size:11px; color:#aaa;"></span>
-                       </div>`
-                    : `<label style="font-size:12px;">Cámara:</label><select id="select-camara"></select>
-                       <div style="display:flex; gap:5px;">
-                           <button class="btn btn-primary" id="btn-iniciar-cam-${this.id}" style="padding:6px;"><i class="fas fa-play"></i> Iniciar</button>
-                           <button class="btn btn-danger" id="btn-apagar-cam-${this.id}" style="padding:6px;"><i class="fas fa-stop"></i> Apagar</button>
-                       </div>`;
+            async poblarListaCamaras() {
+                try {
+                    await navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+                        stream.getTracks().forEach(track => track.stop());
+                    }).catch(e => console.log("Permiso inicial omitido:", e));
 
-                appContainer.innerHTML = `
-                    <div class="sidebar">
-                        ${inputArea}
-                        
-                        <div>
-                            <label style="color:var(--accent); font-weight:bold; font-size:12px;"><i class="fas fa-list-ol"></i> Cantidad de Campos (1 - 20):</label>
-                            <input type="number" id="num-campos-${this.id}" min="1" max="20" value="3">
-                        </div>
+                    const dispositivos = await navigator.mediaDevices.enumerateDevices();
+                    const selectCam = document.getElementById(`select-camara`);
+                    selectCam.innerHTML = '';
+                    const videoDevices = dispositivos.filter(device => device.kind === 'videoinput');
 
-                        <!-- 1. BLOQUE: AJUSTES VISUALES DE BRILLO Y CONTRASTE -->
-                        <div class="section-box">
-                            <h4><i class="fas fa-adjust"></i> Ajuste Visual (Pantalla)</h4>
-                            <label style="font-size: 11px;">Brillo Visual: <span id="val-brillo-${this.id}">100</span>%</label>
-                            <input type="range" id="input-brillo-${this.id}" min="20" max="250" value="100" style="width:100%; cursor:pointer;">
-                            
-                            <label style="font-size: 11px;">Contraste Visual: <span id="val-contraste-${this.id}">100</span>%</label>
-                            <input type="range" id="input-contraste-${this.id}" min="20" max="250" value="100" style="width:100%; cursor:pointer;">
-                        </div>
+                    if (videoDevices.length === 0) {
+                        selectCam.innerHTML = '<option value="">No se encontraron cámaras</option>';
+                        return;
+                    }
 
-                        <!-- 2. BLOQUE: HERRAMIENTAS OPENCV FORZADAS A NINGUNO -->
-                        <div class="section-box" style="border-color: #4a90e2;">
-                            <h4><i class="fas fa-microchip"></i> Herramienta OpenCV Activa</h4>
-                            <label style="font-size: 11px; color: #aaa; margin-bottom: 4px; display: block;">Selecciona el filtro a aplicar:</label>
-                            <select id="select-cv-tool-${this.id}">
-                                <option value="ninguno">Ninguno (Original)</option>
-                                <option value="gris">1. Escala de Grises</option>
-                                <option value="otsu">2. Binarización Umbral Otsu</option>
-                                <option value="adaptive">3. Umbral Adaptativo (Gaussian)</option>
-                                <option value="denoise">4. Reducción de Ruido (Bilateral)</option>
-                                <option value="blur">5. Desenfoque Gaussiano</option>
-                                <option value="canny">6. Detección de Bordes (Canny)</option>
-                                <option value="equalize">7. Ecualización de Histograma</option>
-                            </select>
-                        </div>
+                    videoDevices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.text = device.label || `Cámara ${index + 1}`;
+                        selectCam.appendChild(option);
+                    });
+                } catch (err) {
+                    console.error("Error enumerando cámaras:", err);
+                }
+            }
 
-                        <div>
-                            <label style="color:#ffeb3b; font-size:12px;"><i class="fas fa-keyboard"></i> R0 (Referencia Manual):</label>
-                            <input type="text" id="rango-${this.id}-0" placeholder="Referencia...">
-                        </div>
-                        
-                        <div class="section-box">
-                            <h4 style="justify-content: center;">Resultados OCR por Campos</h4>
-                            <div class="dynamic-fields-container" id="dynamic-inputs-container-${this.id}"></div>
-                        </div>
+            cambiarModo(nuevoModo) {
+                this.modoActual = nuevoModo;
+                const container = document.getElementById(`container-${this.id}`);
+                const btnSel = document.getElementById(`btn-modo-sel-${this.id}`);
+                const btnZoom = document.getElementById(`btn-modo-zoom-${this.id}`);
+                const btnNav = document.getElementById(`btn-modo-nav-${this.id}`);
+                const txtInstruccion = document.getElementById(`modo-instruccion-${this.id}`);
 
-                        <button id="btn-ejecutar-${this.id}" class="btn btn-success"><i class="fas fa-bolt"></i> Ejecutar OCR</button>
-                        <button id="btn-reubicar-${this.id}" class="btn" style="background:#e67e22;"><i class="fas fa-sync-alt"></i> Redibujar Recuadros</button>
-                        <button id="btn-exportar-${this.id}" class="btn btn-primary"><i class="fas fa-file-excel"></i> Exportar Excel</button>
-                        <button id="btn-limpiar-${this.id}" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Limpiar Todo</button>
-                    </div>
-                    
-                    <div class="main-content">
-                        <div class="toolbar">
-                            <button class="btn active" id="mode-sel-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('seleccionar')"><i class="fas fa-vector-square"></i> Dibujar (R<span id="active-box-label-${this.id}">1</span>)</button>
-                            <button class="btn" id="mode-nav-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('navegar')"><i class="fas fa-hand-paper"></i> Navegar</button>
-                            <button class="btn" id="mode-zoom-${this.id}" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.cambiarModo('zoom-area')"><i class="fas fa-search-plus"></i> Zoom Área</button>
-                            <button class="btn" onclick="app${this.id === '1' ? 'Fotos' : 'Camara'}.resetZoom()"><i class="fas fa-expand"></i> Reset</button>
-                        </div>
+                btnSel.classList.remove('active');
+                btnZoom.classList.remove('active');
+                btnNav.classList.remove('active');
 
-                        <div class="media-container" id="container-${this.id}">
-                            <div class="media-wrapper" id="wrapper-${this.id}">
-                                ${this.esCamara ? `<canvas id="cam-canvas-${this.id}" class="live-preview-canvas"></canvas><video id="cam-video" style="display:none;" autoplay playsinline></video>` : `<span style="color: #666; padding: 20px;">Sube imágenes...</span>`}
-                                <div id="sel-box-${this.id}" class="selection-box"></div>
-                                <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
-                            </div>
-                        </div>
+                if (this.modoActual === 'seleccionar') {
+                    container.className = 'image-scroll-container modo-seleccionar';
+                    btnSel.classList.add('active');
+                    txtInstruccion.innerText = "💡 Modo actual: Dibuja los recuadros. Se recordarán para las siguientes imágenes.";
+                } else if (this.modoActual === 'zoom-area') {
+                    container.className = 'image-scroll-container modo-zoom-area';
+                    btnZoom.classList.add('active');
+                    txtInstruccion.innerText = "💡 Modo actual: Dibuja un rectángulo para hacer zoom sobre el área.";
+                } else {
+                    container.className = 'image-scroll-container modo-navegar';
+                    btnNav.classList.add('active');
+                    txtInstruccion.innerText = "💡 Modo actual: Haz clic y arrastra para moverte libremente.";
+                }
+            }
 
-                        <div class="status-bar" id="loading-status-${this.id}">Sistema listo.</div>
+            actualizarCantidadRangos() {
+                let val = parseInt(document.getElementById(`num-rangos-${this.id}`).value);
+                if (isNaN(val) || val < 1) val = 1;
+                if (val > 20) val = 20;
+                document.getElementById(`num-rangos-${this.id}`).value = val;
+                this.totalRangos = val;
+                document.getElementById(`total-box-label-${this.id}`).innerText = this.totalRangos;
+                
+                this.generarCamposFormulario();
+                this.actualizarTablaHeaders();
+                
+                // Si cambiamos la cantidad de rangos, limpiamos la memoria para que vuelva a dibujarlos
+                this.recuadrosActuales = [];
+                this.limpiarVisualesRecuadros();
+                this.actualizarUIformulario();
+            }
 
-                        <div class="table-container">
-                            <table id="tabla-${this.id}">
-                                <thead>
-                                    <tr id="table-head-tr-${this.id}">
-                                        <th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th>
-                                        <th>R0 (Manual)</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
+            resetearConfiguracionRangos() {
+                // Borra la memoria por completo para permitir redibujar desde cero
+                this.recuadrosActuales = [];
+                this.limpiarVisualesRecuadros();
+                this.actualizarUIformulario();
+                document.getElementById(`loading-status-${this.id}`).innerText = "🔄 Memoria de recuadros borrada. Dibuja los nuevos recuadros.";
+            }
+
+            generarCamposFormulario() {
+                const container = document.getElementById(`campos-container-${this.id}`);
+                let html = `
+                    <div class="form-group" style="background: #eef9ff; padding: 6px; border-radius: 4px; border: 1px solid #bce8f1; margin-bottom: 12px;">
+                        <label style="color: #31708f;">📌 Rango 0 (Lectora / Texto Manual):</label>
+                        <input type="text" id="rango-${this.id}-0" placeholder="Escanea o escribe texto aquí..." style="font-weight: bold; color: #2980b9; border: 1px solid #3498db;">
                     </div>
                 `;
-            }
-
-            configurarControlesBasicos() {
-                // Forzar explícitamente que la lista desplegable inicie en 'ninguno'
-                const selectTool = document.getElementById(`select-cv-tool-${this.id}`);
-                if (selectTool) selectTool.value = 'ninguno';
-
-                if (!this.esCamara) {
-                    document.getElementById(`file-upload-${this.id}`).addEventListener('change', (e) => this.cargarImagenes(e));
-                    document.getElementById(`btn-ejecutar-${this.id}`).addEventListener('click', () => this.ejecutarProcesoYpasarSiguiente());
-                } else {
-                    document.getElementById(`btn-iniciar-cam-${this.id}`).addEventListener('click', () => this.iniciarCamara());
-                    document.getElementById(`btn-apagar-cam-${this.id}`).addEventListener('click', () => this.apagarCamara());
-                    document.getElementById(`btn-ejecutar-${this.id}`).addEventListener('click', () => this.ejecutarProcesoCamara());
-                }
-
-                document.getElementById(`btn-reubicar-${this.id}`).addEventListener('click', () => this.reiniciarRecuadrosActuales());
-                document.getElementById(`btn-exportar-${this.id}`).addEventListener('click', () => this.exportarExcel());
-                document.getElementById(`btn-limpiar-${this.id}`).addEventListener('click', () => this.limpiarTodoApp());
-
-                document.getElementById(`num-campos-${this.id}`).addEventListener('change', (e) => {
-                    let val = parseInt(e.target.value);
-                    if (val < 1) val = 1; if (val > 20) val = 20;
-                    e.target.value = val;
-                    this.totalRangos = val;
-                    this.actualizarInputsDinamicosYTabla();
-                    if (this.recuadrosActuales.length > this.totalRangos) {
-                        this.recuadrosActuales = this.recuadrosActuales.slice(0, this.totalRangos);
-                        this.redibujarRecuadrosEnPantalla();
-                    }
-                    this.actualizarUIformulario();
-                });
-
-                ['brillo', 'contraste'].forEach(tipo => {
-                    document.getElementById(`input-${tipo}-${this.id}`).addEventListener('input', (e) => {
-                        document.getElementById(`val-${tipo}-${this.id}`).innerText = e.target.value;
-                        this.actualizarFiltroVisualPantalla();
-                    });
-                });
-
-                this.actualizarInputsDinamicosYTabla();
-            }
-
-            actualizarFiltroVisualPantalla() {
-                const b = document.getElementById(`input-brillo-${this.id}`).value;
-                const c = document.getElementById(`input-contraste-${this.id}`).value;
-                if (this.mediaElement) {
-                    this.mediaElement.style.filter = `brightness(${b}%) contrast(${c}%)`;
-                }
-            }
-
-            actualizarInputsDinamicosYTabla() {
-                const container = document.getElementById(`dynamic-inputs-container-${this.id}`);
-                container.innerHTML = '';
                 for (let i = 1; i <= this.totalRangos; i++) {
-                    container.innerHTML += `
-                        <div style="margin-bottom:4px;">
-                            <label style="font-size:10px; color:#aaa;">Rango ${i}:</label>
-                            <input type="text" id="rango-${this.id}-${i}" readonly style="background:#111; color:#4caf50; font-weight:bold; padding:4px; font-size:11px;">
+                    html += `
+                        <div class="form-group">
+                            <label>Rango ${i}:</label>
+                            <input type="text" id="rango-${this.id}-${i}" placeholder="Pendiente...">
                         </div>
                     `;
                 }
-
-                const trHead = document.getElementById(`table-head-tr-${this.id}`);
-                let htmlTh = `<th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th><th>R0</th>`;
-                for (let i = 1; i <= this.totalRangos; i++) htmlTh += `<th>R${i}</th>`;
-                trHead.innerHTML = htmlTh;
-                this.tablaData = [];
-                this.renderizarTablaHTML();
+                container.innerHTML = html;
             }
 
-            async poblarCamaras() {
-                try {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                    document.getElementById(`select-camara`).innerHTML = videoDevices.map(d => `<option value="${d.deviceId}">${d.label || 'Cámara'}</option>`).join('');
-                } catch (e) { console.error(e); }
-            }
-
-            procesarConOpenCV(canvasInput) {
-                if (typeof cv === 'undefined' || !cv.Mat) {
-                    return canvasInput.toDataURL('image/png');
+            actualizarTablaHeaders() {
+                const trHead = document.getElementById(`tabla-head-${this.id}`);
+                let tituloCol = this.esCamara ? 'Captura / Hora' : 'Archivo';
+                let html = `<th>❌</th><th>${tituloCol}</th><th>R0</th>`;
+                for (let i = 1; i <= this.totalRangos; i++) {
+                    html += `<th>R${i}</th>`;
                 }
-
-                const herramienta = document.getElementById(`select-cv-tool-${this.id}`).value;
-                if (herramienta === 'ninguno') {
-                    return canvasInput.toDataURL('image/png');
-                }
-
-                try {
-                    let src = cv.imread(canvasInput);
-                    let dst = new cv.Mat();
-
-                    if (herramienta === 'gris') {
-                        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
-                    } else if (herramienta === 'otsu') {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                        cv.threshold(gray, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-                        gray.delete();
-                    } else if (herramienta === 'adaptive') {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                        cv.adaptiveThreshold(gray, dst, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
-                        gray.delete();
-                    } else if (herramienta === 'denoise') {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                        cv.bilateralFilter(gray, dst, 9, 75, 75);
-                        gray.delete();
-                    } else if (herramienta === 'blur') {
-                        let ksize = new cv.Size(5, 5);
-                        cv.GaussianBlur(src, dst, ksize, 0, 0, cv.BORDER_DEFAULT);
-                    } else if (herramienta === 'canny') {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                        cv.Canny(gray, dst, 50, 150, 3, false);
-                        gray.delete();
-                    } else if (herramienta === 'equalize') {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                        cv.equalizeHist(gray, dst);
-                        gray.delete();
-                    } else {
-                        src.copyTo(dst);
-                    }
-
-                    cv.imshow(canvasInput, dst);
-                    src.delete();
-                    dst.delete();
-                } catch (err) {
-                    console.error("Error aplicando OpenCV:", err);
-                }
-
-                return canvasInput.toDataURL('image/png');
+                trHead.innerHTML = html;
             }
 
-            cambiarModo(modo) {
-                this.modoActual = modo;
-                document.getElementById(`mode-sel-${this.id}`).classList.remove('active');
-                document.getElementById(`mode-nav-${this.id}`).classList.remove('active');
-                document.getElementById(`mode-zoom-${this.id}`).classList.remove('active');
-                
-                let btnId = modo === 'seleccionar' ? `mode-sel-${this.id}` : (modo === 'navegar' ? `mode-nav-${this.id}` : `mode-zoom-${this.id}`);
-                document.getElementById(btnId).classList.add('active');
-                document.getElementById(`container-${this.id}`).style.cursor = modo === 'navegar' ? 'grab' : (modo === 'zoom-area' ? 'zoom-in' : 'crosshair');
-            }
-
-            renderizarTablaHTML() {
-                const tbody = document.querySelector(`#tabla-${this.id} tbody`);
-                tbody.innerHTML = '';
-                this.tablaData.forEach(row => {
-                    const tr = document.createElement('tr');
-                    const keyMain = this.esCamara ? 'Captura / Hora' : 'Archivo';
-                    let htmlTd = `<td>${row[keyMain] || ''}</td><td>${row['R0'] || ''}</td>`;
-                    for(let i=1; i<=this.totalRangos; i++) htmlTd += `<td>${row[`R${i}`] || ''}</td>`;
-                    tr.innerHTML = htmlTd;
-                    tbody.appendChild(tr);
-                });
-                tbody.parentElement.parentElement.scrollTop = tbody.parentElement.parentElement.scrollHeight;
+            limpiarVisualesRecuadros() {
+                const wrapper = document.getElementById(`wrapper-${this.id}`);
+                if (wrapper) {
+                    wrapper.querySelectorAll('.saved-box').forEach(el => el.remove());
+                }
             }
 
             redibujarRecuadrosEnPantalla() {
                 this.limpiarVisualesRecuadros();
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
-                this.recuadrosActuales.forEach((b, index) => {
+                
+                this.recuadrosActuales.forEach((boxData, index) => {
                     const permBox = document.createElement('div');
                     permBox.className = 'saved-box';
-                    permBox.style.left = b.left + 'px'; permBox.style.top = b.top + 'px';
-                    permBox.style.width = b.width + 'px'; permBox.style.height = b.height + 'px';
+                    permBox.style.left = boxData.left + 'px';
+                    permBox.style.top = boxData.top + 'px';
+                    permBox.style.width = boxData.width + 'px';
+                    permBox.style.height = boxData.height + 'px';
                     permBox.innerHTML = `<span>R${index + 1}</span>`;
                     wrapper.appendChild(permBox);
                 });
             }
 
-            limpiarVisualesRecuadros() {
-                const wrapper = document.getElementById(`wrapper-${this.id}`);
-                if (wrapper) wrapper.querySelectorAll('.saved-box').forEach(box => box.remove());
+            renderizarTablaHTML() {
+                const tbody = document.querySelector(`#tabla-datos-${this.id} tbody`);
+                tbody.innerHTML = '';
+
+                this.tablaData.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    let colPrincipal = this.esCamara ? (row['Captura / Hora'] || '') : (row['Archivo'] || '');
+                    let html = `<td><button class="btn-eliminar-fila" onclick="app${this.esCamara ? 'Camara' : 'Fotos'}.eliminarFila(${index})" title="Quitar este registro">X</button></td>`;
+                    html += `<td>${colPrincipal}</td>`;
+                    html += `<td>${row['R0'] || ''}</td>`;
+
+                    for (let i = 1; i <= this.totalRangos; i++) {
+                        html += `<td>${row[`R${i}`] || ''}</td>`;
+                    }
+                    tr.innerHTML = html;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            eliminarFila(index) {
+                this.tablaData.splice(index, 1);
+                this.renderizarTablaHTML();
             }
 
             limpiarTodoApp() {
-                if (!confirm("¿Deseas limpiar todos los registros?")) return;
+                if (!confirm("¿Estás seguro de que deseas limpiar todo (tabla, imágenes y recuadros guardados)?")) return;
+
                 this.tablaData = [];
                 this.renderizarTablaHTML();
                 this.recuadrosActuales = [];
-                this.reiniciarRecuadrosActuales();
 
                 if (!this.esCamara) {
                     this.listaImagenes = [];
                     this.indiceActual = 0;
-                    document.getElementById(`wrapper-${this.id}`).innerHTML = `<span style="color: #fff; padding: 20px;">Sin imágenes</span><div id="sel-box-${this.id}" class="selection-box"></div><div id="zoom-box-${this.id}" class="zoom-selection-box"></div>`;
+                    const wrapper = document.getElementById(`wrapper-${this.id}`);
+                    wrapper.innerHTML = `<span style="color: #fff; padding: 20px; display: block;">Sin imágenes cargadas</span><div id="sel-box-${this.id}" class="selection-box"></div><div id="zoom-box-${this.id}" class="zoom-selection-box"></div>`;
                     document.getElementById(`queue-banner-${this.id}`).style.display = 'none';
+                    document.getElementById(`loading-status-${this.id}`).innerText = "Sube fotos o una carpeta para comenzar.";
                 } else {
                     this.apagarCamara();
-                    const canvasCam = document.getElementById(`cam-canvas-${this.id}`);
-                    if (canvasCam) {
-                        const ctx = canvasCam.getContext('2d');
-                        ctx.clearRect(0, 0, canvasCam.width, canvasCam.height);
-                        canvasCam.width = 0;
-                        canvasCam.height = 0;
-                    }
-                    document.getElementById(`wrapper-${this.id}`).innerHTML = `
-                        <canvas id="cam-canvas-${this.id}" class="live-preview-canvas"></canvas>
-                        <video id="cam-video" style="display:none;" autoplay playsinline></video>
-                        <div id="sel-box-${this.id}" class="selection-box"></div>
-                        <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
-                    `;
+                    document.getElementById(`loading-status-${this.id}`).innerText = "Cámara apagada y datos limpiados.";
                 }
-                document.getElementById(`rango-${this.id}-0`).value = '';
+
+                for(let i=0; i<=this.totalRangos; i++) {
+                    const input = document.getElementById(`rango-${this.id}-${i}`);
+                    if(input) input.value = '';
+                }
+                this.actualizarUIformulario();
             }
 
             cargarImagenes(event) {
                 const files = Array.from(event.target.files).filter(file => file.type.startsWith('image/'));
                 if (files.length === 0) return;
+
                 this.listaImagenes = [];
                 let cargados = 0;
+
                 files.forEach((file) => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        this.listaImagenes.push({ file: file, name: file.name, src: e.target.result });
+                        this.listaImagenes.push({
+                            file: file,
+                            name: file.name,
+                            src: e.target.result
+                        });
                         cargados++;
                         if (cargados === files.length) {
                             this.listaImagenes.sort((a, b) => a.name.localeCompare(b.name));
@@ -548,24 +593,37 @@
 
             mostrarFotoActual() {
                 if (this.listaImagenes.length === 0) return;
-                if (this.indiceActual >= this.listaImagenes.length) this.indiceActual = this.listaImagenes.length - 1;
+
+                if (this.indiceActual >= this.listaImagenes.length) {
+                    this.indiceActual = this.listaImagenes.length - 1;
+                }
+
                 const foto = this.listaImagenes[this.indiceActual];
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
+                
                 wrapper.innerHTML = `
                     <img id="preview-img-${this.id}" class="preview-img" src="${foto.src}" alt="${foto.name}">
                     <div id="sel-box-${this.id}" class="selection-box"></div>
                     <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
                 `;
-                document.getElementById(`queue-banner-${this.id}`).style.display = 'block';
+
+                document.getElementById(`queue-banner-${this.id}`).style.display = 'flex';
                 document.getElementById(`queue-text-${this.id}`).innerText = `Foto ${this.indiceActual + 1} de ${this.listaImagenes.length}`;
                 document.getElementById(`current-filename-${this.id}`).innerText = `📁 ${foto.name}`;
 
                 this.mediaElement = document.getElementById(`preview-img-${this.id}`);
+
                 this.mediaElement.onload = () => {
                     this.resetZoom();
-                    this.actualizarFiltroVisualPantalla();
                     this.configurarInteraccionCanvas();
-                    if (this.recuadrosActuales.length === this.totalRangos) this.redibujarRecuadrosEnPantalla();
+                    
+                    // Mantiene los recuadros anteriores si ya se habían dibujado; si no, pide dibujarlos
+                    if (this.recuadrosActuales.length === this.totalRangos) {
+                        this.redibujarRecuadrosEnPantalla();
+                        document.getElementById(`loading-status-${this.id}`).innerText = `✅ Foto cargada. Usando ${this.totalRangos} recuadros guardados previamente.`;
+                    } else {
+                        document.getElementById(`loading-status-${this.id}`).innerText = `✏️ Dibuja los recuadros (${this.recuadrosActuales.length}/${this.totalRangos}).`;
+                    }
                     this.actualizarUIformulario();
                 };
             }
@@ -573,76 +631,55 @@
             async iniciarCamara() {
                 try {
                     this.apagarCamara();
-                    
-                    const wrapper = document.getElementById(`wrapper-${this.id}`);
-                    if (!document.getElementById(`cam-canvas-${this.id}`)) {
-                        wrapper.innerHTML = `
-                            <canvas id="cam-canvas-${this.id}" class="live-preview-canvas"></canvas>
-                            <video id="cam-video" style="display:none;" autoplay playsinline></video>
-                            <div id="sel-box-${this.id}" class="selection-box"></div>
-                            <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
-                        `;
-                    }
+                    const selectCam = document.getElementById(`select-camara`);
+                    const deviceIdSelected = selectCam.value;
 
-                    const deviceId = document.getElementById(`select-camara`).value;
-                    this.streamCamara = await navigator.mediaDevices.getUserMedia({
-                        video: deviceId ? { deviceId: { exact: deviceId } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
-                    });
-                    
-                    const videoEl = document.getElementById(`cam-video`);
-                    videoEl.srcObject = this.streamCamara;
-                    
-                    await new Promise((resolve) => {
-                        videoEl.onloadedmetadata = () => {
-                            videoEl.play();
-                            resolve();
-                        };
-                    });
-
-                    const canvasCam = document.getElementById(`cam-canvas-${this.id}`);
-                    canvasCam.width = videoEl.videoWidth || 1280;
-                    canvasCam.height = videoEl.videoHeight || 720;
-                    
-                    this.mediaElement = canvasCam;
-                    this.resetZoom();
-                    this.actualizarFiltroVisualPantalla();
-                    this.configurarInteraccionCanvas();
-                    if (this.recuadrosActuales.length === this.totalRangos) this.redibujarRecuadrosEnPantalla();
-                    this.actualizarUIformulario();
-
-                    const ctxCam = canvasCam.getContext('2d');
-                    const loopCamara = () => {
-                        if (!this.streamCamara) return;
-                        if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
-                            ctxCam.drawImage(videoEl, 0, 0, canvasCam.width, canvasCam.height);
-                            this.procesarConOpenCV(canvasCam);
-                        }
-                        this.animFrameId = requestAnimationFrame(loopCamara);
+                    const constraints = {
+                        video: deviceIdSelected ? { deviceId: { exact: deviceIdSelected } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
                     };
-                    loopCamara();
 
-                } catch (e) { 
-                    console.error(e);
-                    alert("No se pudo iniciar la cámara."); 
+                    this.streamCamara = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.mediaElement = document.getElementById(`cam-video`);
+                    this.mediaElement.srcObject = this.streamCamara;
+                    
+                    this.resetZoom();
+                    this.configurarInteraccionCanvas();
+
+                    if (this.recuadrosActuales.length === this.totalRangos) {
+                        this.redibujarRecuadrosEnPantalla();
+                        document.getElementById(`loading-status-${this.id}`).innerText = "✅ Cámara activa. Usando recuadros guardados.";
+                    } else {
+                        document.getElementById(`loading-status-${this.id}`).innerText = `✏️ Cámara activa. Dibuja los recuadros (${this.recuadrosActuales.length}/${this.totalRangos}).`;
+                    }
+                    this.actualizarUIformulario();
+                } catch (err) {
+                    console.error(err);
+                    alert("No se pudo iniciar la cámara seleccionada.");
                 }
             }
 
             apagarCamara() {
-                if (this.animFrameId) {
-                    cancelAnimationFrame(this.animFrameId);
-                    this.animFrameId = null;
-                }
                 if (this.streamCamara) {
-                    this.streamCamara.getTracks().forEach(t => t.stop());
+                    this.streamCamara.getTracks().forEach(track => track.stop());
                     this.streamCamara = null;
                 }
-                const v = document.getElementById(`cam-video`);
-                if (v) v.srcObject = null;
+                const videoEl = document.getElementById(`cam-video`);
+                if (videoEl) videoEl.srcObject = null;
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏹️ Cámara apagada.";
             }
 
             resetZoom() {
-                this.scale = 1; this.panX = 0; this.panY = 0;
-                document.getElementById(`wrapper-${this.id}`).style.transform = `translate(0px, 0px) scale(1)`;
+                this.scale = 1;
+                this.panX = 0;
+                this.panY = 0;
+                this.actualizarTransformacionCanvas();
+            }
+
+            actualizarTransformacionCanvas() {
+                const wrapper = document.getElementById(`wrapper-${this.id}`);
+                if (wrapper) {
+                    wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+                }
             }
 
             configurarInteraccionCanvas() {
@@ -654,213 +691,373 @@
                 container.onwheel = (e) => {
                     e.preventDefault();
                     if (!this.mediaElement) return;
-                    let rect = container.getBoundingClientRect();
-                    let mX = e.clientX - rect.left, mY = e.clientY - rect.top;
-                    let oldS = this.scale;
-                    this.scale = Math.max(0.5, Math.min(e.deltaY < 0 ? this.scale * 1.15 : this.scale / 1.15, 15));
-                    this.panX = mX - (mX - this.panX) * (this.scale / oldS);
-                    this.panY = mY - (mY - this.panY) * (this.scale / oldS);
-                    wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+
+                    const rect = container.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    const zoomFactor = 1.15;
+                    let oldScale = this.scale;
+
+                    if (e.deltaY < 0) {
+                        this.scale *= zoomFactor;
+                    } else {
+                        this.scale /= zoomFactor;
+                    }
+
+                    this.scale = Math.max(0.5, Math.min(this.scale, 15));
+                    this.panX = mouseX - (mouseX - this.panX) * (this.scale / oldScale);
+                    this.panY = mouseY - (mouseY - this.panY) * (this.scale / oldScale);
+
+                    this.actualizarTransformacionCanvas();
                 };
 
                 container.onmousedown = (e) => {
                     if (!this.mediaElement) return;
+
                     if (e.button === 0) {
                         if (this.modoActual === 'navegar') {
                             this.isDraggingImage = true;
-                            this.startPanX = e.clientX - this.panX; this.startPanY = e.clientY - this.panY;
-                            document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU);
-                            e.preventDefault(); return;
+                            this.startPanX = e.clientX - this.panX;
+                            this.startPanY = e.clientY - this.panY;
+                            
+                            document.addEventListener('mousemove', onMouseMoveGlobal);
+                            document.addEventListener('mouseup', onMouseUpGlobal);
+                            e.preventDefault();
+                            return;
                         }
-                        if (this.recuadrosActuales.length >= this.totalRangos && this.modoActual === 'seleccionar') return;
 
-                        let rect = wrapper.getBoundingClientRect();
+                        // Si ya completamos todos los recuadros y hacemos clic en modo seleccionar, ignoramos el dibujo a menos que le den a reubicar
+                        if (this.recuadrosActuales.length >= this.totalRangos && this.modoActual === 'seleccionar') {
+                            return;
+                        }
+
+                        const rect = wrapper.getBoundingClientRect();
                         this.startX = (e.clientX - rect.left) / this.scale;
                         this.startY = (e.clientY - rect.top) / this.scale;
                         this.isDrawing = true;
 
-                        let activeB = this.modoActual === 'zoom-area' ? zoomBox : selectionBox;
-                        activeB.style.left = this.startX + 'px'; activeB.style.top = this.startY + 'px';
-                        activeB.style.width = '0px'; activeB.style.height = '0px'; activeB.style.display = 'block';
-                        document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU);
+                        let activeBox = (this.modoActual === 'zoom-area') ? zoomBox : selectionBox;
+                        activeBox.style.left = this.startX + 'px';
+                        activeBox.style.top = this.startY + 'px';
+                        activeBox.style.width = '0px';
+                        activeBox.style.height = '0px';
+                        activeBox.style.display = 'block';
+
+                        document.addEventListener('mousemove', onMouseMoveGlobal);
+                        document.addEventListener('mouseup', onMouseUpGlobal);
                         e.preventDefault();
                     }
                 };
 
-                const onMM = (e) => {
+                const onMouseMoveGlobal = (e) => {
                     if (this.isDraggingImage) {
-                        this.panX = e.clientX - this.startPanX; this.panY = e.clientY - this.startPanY;
-                        wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+                        this.panX = e.clientX - this.startPanX;
+                        this.panY = e.clientY - this.startPanY;
+                        this.actualizarTransformacionCanvas();
                         return;
                     }
+
                     if (!this.isDrawing) return;
-                    let rect = wrapper.getBoundingClientRect();
-                    let curX = (e.clientX - rect.left) / this.scale, curY = (e.clientY - rect.top) / this.scale;
-                    let w = curX - this.startX, h = curY - this.startY;
-                    let activeB = this.modoActual === 'zoom-area' ? zoomBox : selectionBox;
-                    activeB.style.width = Math.abs(w) + 'px'; activeB.style.height = Math.abs(h) + 'px';
-                    activeB.style.left = (w < 0 ? curX : this.startX) + 'px';
-                    activeB.style.top = (h < 0 ? curY : this.startY) + 'px';
+                    const rect = wrapper.getBoundingClientRect();
+                    let currentX = (e.clientX - rect.left) / this.scale;
+                    let currentY = (e.clientY - rect.top) / this.scale;
+
+                    const width = currentX - this.startX;
+                    const height = currentY - this.startY;
+
+                    let activeBox = (this.modoActual === 'zoom-area') ? zoomBox : selectionBox;
+                    activeBox.style.width = Math.abs(width) + 'px';
+                    activeBox.style.height = Math.abs(height) + 'px';
+                    activeBox.style.left = (width < 0 ? currentX : this.startX) + 'px';
+                    activeBox.style.top = (height < 0 ? currentY : this.startY) + 'px';
                 };
 
-                const onMU = () => {
-                    document.removeEventListener('mousemove', onMM); document.removeEventListener('mouseup', onMU);
-                    if (this.isDraggingImage) { this.isDraggingImage = false; return; }
+                const onMouseUpGlobal = (e) => {
+                    document.removeEventListener('mousemove', onMouseMoveGlobal);
+                    document.removeEventListener('mouseup', onMouseUpGlobal);
+
+                    if (this.isDraggingImage) {
+                        this.isDraggingImage = false;
+                        return;
+                    }
+
                     if (!this.isDrawing) return;
                     this.isDrawing = false;
 
                     if (this.modoActual === 'zoom-area') {
+                        const width = parseFloat(zoomBox.style.width);
+                        const height = parseFloat(zoomBox.style.height);
                         zoomBox.style.display = 'none';
-                        let w = parseFloat(zoomBox.style.width), h = parseFloat(zoomBox.style.height);
-                        if (w > 5 && h > 5) {
-                            let bx = parseFloat(zoomBox.style.left), by = parseFloat(zoomBox.style.top);
-                            this.scale = Math.max(1, Math.min(Math.min(container.clientWidth/w, container.clientHeight/h), 15));
-                            this.panX = -bx * this.scale + (container.clientWidth - w * this.scale) / 2;
-                            this.panY = -by * this.scale + (container.clientHeight - h * this.scale) / 2;
-                            wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+
+                        if (width > 5 && height > 5) {
+                            const boxLeft = parseFloat(zoomBox.style.left);
+                            const boxTop = parseFloat(zoomBox.style.top);
+                            const containerWidth = container.clientWidth;
+                            const containerHeight = container.clientHeight;
+
+                            const scaleX = containerWidth / width;
+                            const scaleY = containerHeight / height;
+                            let newScale = Math.min(scaleX, scaleY);
+                            newScale = Math.max(1, Math.min(newScale, 15));
+
+                            this.scale = newScale;
+                            this.panX = -boxLeft * this.scale + (containerWidth - width * this.scale) / 2;
+                            this.panY = -boxTop * this.scale + (containerHeight - height * this.scale) / 2;
+
+                            this.actualizarTransformacionCanvas();
                             this.cambiarModo('seleccionar');
                         }
                         return;
                     }
 
+                    const width = parseFloat(selectionBox.style.width);
+                    const height = parseFloat(selectionBox.style.height);
                     selectionBox.style.display = 'none';
-                    let w = parseFloat(selectionBox.style.width), h = parseFloat(selectionBox.style.height);
-                    if (w > 3 && h > 3 && this.recuadrosActuales.length < this.totalRangos) {
-                        let boxData = { left: parseFloat(selectionBox.style.left), top: parseFloat(selectionBox.style.top), width: w, height: h };
+
+                    if (width > 3 && height > 3) {
+                        if (this.recuadrosActuales.length >= this.totalRangos) {
+                            return;
+                        }
+
+                        const boxData = {
+                            left: parseFloat(selectionBox.style.left),
+                            top: parseFloat(selectionBox.style.top),
+                            width: width,
+                            height: height
+                        };
+
                         this.recuadrosActuales.push(boxData);
-                        
-                        let permBox = document.createElement('div');
+
+                        const permBox = document.createElement('div');
                         permBox.className = 'saved-box';
-                        permBox.style.left = boxData.left + 'px'; permBox.style.top = boxData.top + 'px';
-                        permBox.style.width = boxData.width + 'px'; permBox.style.height = boxData.height + 'px';
+                        permBox.style.left = boxData.left + 'px';
+                        permBox.style.top = boxData.top + 'px';
+                        permBox.style.width = boxData.width + 'px';
+                        permBox.style.height = boxData.height + 'px';
                         permBox.innerHTML = `<span>R${this.recuadrosActuales.length}</span>`;
                         wrapper.appendChild(permBox);
+
                         this.actualizarUIformulario();
+
+                        if (this.recuadrosActuales.length < this.totalRangos) {
+                            document.getElementById(`loading-status-${this.id}`).innerText = `✅ Rango ${this.recuadrosActuales.length} guardado en memoria. Falta(n) ${this.totalRangos - this.recuadrosActuales.length}.`;
+                        } else {
+                            document.getElementById(`loading-status-${this.id}`).innerText = `🎉 ¡${this.totalRangos} recuadros guardados permanentemente para las siguientes fotos!`;
+                        }
                     }
                 };
             }
 
             actualizarUIformulario() {
-                let sig = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
-                let el = document.getElementById(`active-box-label-${this.id}`);
-                if (el) el.innerText = sig;
+                const siguienteRango = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
+                document.getElementById(`active-box-label-${this.id}`).innerText = siguienteRango;
             }
 
             reiniciarRecuadrosActuales() {
+                // El botón "🔄 Reubicar / Redibujar" limpia los recuadros actuales para permitirte dibujarlos de nuevo
                 this.recuadrosActuales = [];
                 this.limpiarVisualesRecuadros();
-                document.getElementById(`sel-box-${this.id}`).style.display = 'none';
-                document.getElementById(`zoom-box-${this.id}`).style.display = 'none';
-                for (let i = 1; i <= this.totalRangos; i++) {
-                    let inp = document.getElementById(`rango-${this.id}-${i}`);
-                    if (inp) inp.value = '';
+                const selBox = document.getElementById(`sel-box-${this.id}`);
+                const zoomBox = document.getElementById(`zoom-box-${this.id}`);
+                if (selBox) selBox.style.display = 'none';
+                if (zoomBox) zoomBox.style.display = 'none';
+
+                for(let i=1; i<=this.totalRangos; i++) {
+                    const input = document.getElementById(`rango-${this.id}-${i}`);
+                    if(input) input.value = '';
                 }
+                document.getElementById(`loading-status-${this.id}`).innerText = "🔄 MODO REUBICACIÓN: Dibuja los recuadros nuevamente.";
                 this.actualizarUIformulario();
             }
 
             async ejecutarProcesoYpasarSiguiente() {
-                if (!this.esCamara && this.listaImagenes.length === 0) return alert("Sube imágenes primero.");
-                if (this.recuadrosActuales.length < this.totalRangos) return alert(`Dibuja los ${this.totalRangos} recuadros requeridos.`);
+                if (this.listaImagenes.length === 0) {
+                    alert("No hay imágenes cargadas.");
+                    return;
+                }
+
+                if (this.recuadrosActuales.length < this.totalRangos) {
+                    alert(`Debes terminar de dibujar los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
+                    return;
+                }
+
+                if (this.indiceActual >= this.listaImagenes.length) {
+                    this.indiceActual = 0;
+                }
 
                 const foto = this.listaImagenes[this.indiceActual];
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Aplicando OpenCV y ejecutando OCR...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Ejecutando OCR en los recuadros guardados...";
 
                 const scaleX = this.mediaElement.naturalWidth / this.mediaElement.width;
                 const scaleY = this.mediaElement.naturalHeight / this.mediaElement.height;
-                let resultados = new Array(this.totalRangos).fill('');
+
+                let resultadosOCR = new Array(this.totalRangos).fill('');
 
                 try {
                     const worker = await Tesseract.createWorker('spa+eng');
-                    
-                    let imgObj = new Image();
-                    imgObj.src = foto.src;
-                    await new Promise((resolve, reject) => {
-                        imgObj.onload = resolve;
-                        imgObj.onerror = reject;
-                    });
 
                     for (let i = 0; i < this.totalRangos; i++) {
-                        let b = this.recuadrosActuales[i];
-                        let w = b.width * scaleX, h = b.height * scaleY;
+                        const b = this.recuadrosActuales[i];
+                        const x = b.left * scaleX;
+                        const y = b.top * scaleY;
+                        const w = b.width * scaleX;
+                        const h = b.height * scaleY;
 
-                        let canvas = document.createElement('canvas');
-                        canvas.width = w; canvas.height = h;
-                        let ctx = canvas.getContext('2d');
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
 
-                        ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                        let processedDataUrl = this.procesarConOpenCV(canvas);
+                        const imageObj = new Image();
+                        imageObj.src = foto.src;
+                        
+                        const textoRecorte = await new Promise((resolve) => {
+                            imageObj.onload = async () => {
+                                ctx.drawImage(imageObj, x, y, w, h, 0, 0, w, h);
+                                const croppedDataUrl = canvas.toDataURL('image/png');
+                                const ret = await worker.recognize(croppedDataUrl);
+                                let texto = ret.data.text.trim();
+                                
+                                texto = texto.replace(/\s*@\s*/g, '@');
+                                texto = texto.replace(/\s*\.\s*/g, '.');
+                                texto = texto.replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
+                                
+                                resolve(texto);
+                            };
+                        });
 
-                        let ret = await worker.recognize(processedDataUrl);
-                        resultados[i] = ret.data.text.trim().replace(/\s+/g, ' ');
-                        document.getElementById(`rango-${this.id}-${i+1}`).value = resultados[i];
+                        resultadosOCR[i] = textoRecorte;
+                        document.getElementById(`rango-${this.id}-${i+1}`).value = textoRecorte;
                     }
+
                     await worker.terminate();
 
-                    let rowData = { "Archivo": foto.name, "R0": document.getElementById(`rango-${this.id}-0`).value.trim() };
-                    for (let i = 0; i < this.totalRangos; i++) rowData[`R${i+1}`] = resultados[i];
+                    const valR0 = document.getElementById(`rango-${this.id}-0`).value.trim();
+
+                    let rowData = { "Archivo": foto.name, "R0": valR0 };
+                    for (let i = 0; i < this.totalRangos; i++) {
+                        rowData[`R${i+1}`] = resultadosOCR[i];
+                    }
                     this.tablaData.push(rowData);
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
+                    document.getElementById(`rango-${this.id}-0`).focus();
+
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡Procesado con recuadros guardados! Pasando a la siguiente foto...";
+
                     setTimeout(() => {
                         this.indiceActual++;
-                        if (this.indiceActual < this.listaImagenes.length) this.mostrarFotoActual();
-                        else document.getElementById(`loading-status-${this.id}`).innerText = "🏁 ¡Lote finalizado!";
-                    }, 500);
-                } catch (e) { console.error(e); }
+                        if (this.indiceActual < this.listaImagenes.length) {
+                            this.mostrarFotoActual();
+                        } else {
+                            this.indiceActual = this.listaImagenes.length - 1;
+                            document.getElementById(`loading-status-${this.id}`).innerText = "🏁 ¡Lote completado con éxito!";
+                        }
+                    }, 1000);
+
+                } catch (err) {
+                    console.error(err);
+                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al ejecutar el OCR masivo.";
+                }
             }
 
             async ejecutarProcesoCamara() {
-                if (this.recuadrosActuales.length < this.totalRangos) return alert(`Dibuja los ${this.totalRangos} recuadros requeridos.`);
-                if (!this.streamCamara) return alert("Enciende la cámara primero.");
+                if (this.recuadrosActuales.length < this.totalRangos) {
+                    alert(`Debes terminar de dibujar los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
+                    return;
+                }
 
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Procesando frame con OpenCV y Tesseract...";
-                const canvasCam = document.getElementById(`cam-canvas-${this.id}`);
-                const scaleX = canvasCam.width / canvasCam.clientWidth;
-                const scaleY = canvasCam.height / canvasCam.clientHeight;
-                let resultados = new Array(this.totalRangos).fill('');
+                if (!this.streamCamara) {
+                    alert("La cámara no está encendida.");
+                    return;
+                }
+
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando fotograma de cámara...";
+
+                const videoEl = document.getElementById(`cam-video`);
+                const natW = videoEl.videoWidth || 1280;
+                const natH = videoEl.videoHeight || 720;
+                const clientW = videoEl.clientWidth;
+                const clientH = videoEl.clientHeight;
+
+                const scaleX = natW / clientW;
+                const scaleY = natH / clientH;
+
+                let resultadosOCR = new Array(this.totalRangos).fill('');
 
                 try {
                     const worker = await Tesseract.createWorker('spa+eng');
+
                     for (let i = 0; i < this.totalRangos; i++) {
-                        let b = this.recuadrosActuales[i];
-                        let w = b.width * scaleX, h = b.height * scaleY;
+                        const b = this.recuadrosActuales[i];
+                        const x = b.left * scaleX;
+                        const y = b.top * scaleY;
+                        const w = b.width * scaleX;
+                        const h = b.height * scaleY;
 
-                        let canvas = document.createElement('canvas');
-                        canvas.width = w; canvas.height = h;
-                        let ctx = canvas.getContext('2d');
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+
+                        ctx.drawImage(videoEl, x, y, w, h, 0, 0, w, h);
+                        const croppedDataUrl = canvas.toDataURL('image/png');
+
+                        const ret = await worker.recognize(croppedDataUrl);
+                        let texto = ret.data.text.trim();
                         
-                        ctx.drawImage(canvasCam, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                        let processedDataUrl = canvas.toDataURL('image/png');
+                        texto = texto.replace(/\s*@\s*/g, '@');
+                        texto = texto.replace(/\s*\.\s*/g, '.');
+                        texto = texto.replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
 
-                        let ret = await worker.recognize(processedDataUrl);
-                        resultados[i] = ret.data.text.trim().replace(/\s+/g, ' ');
-                        document.getElementById(`rango-${this.id}-${i+1}`).value = resultados[i];
+                        resultadosOCR[i] = texto;
+                        document.getElementById(`rango-${this.id}-${i+1}`).value = texto;
                     }
+
                     await worker.terminate();
 
-                    let rowData = { "Captura / Hora": new Date().toLocaleTimeString(), "R0": document.getElementById(`rango-${this.id}-0`).value.trim() };
-                    for (let i = 0; i < this.totalRangos; i++) rowData[`R${i+1}`] = resultados[i];
+                    const valR0 = document.getElementById(`rango-${this.id}-0`).value.trim();
+                    const timestamp = new Date().toLocaleTimeString();
+                    
+                    let rowData = { "Captura / Hora": timestamp, "R0": valR0 };
+                    for (let i = 0; i < this.totalRangos; i++) {
+                        rowData[`R${i+1}`] = resultadosOCR[i];
+                    }
                     this.tablaData.push(rowData);
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ Captura de cámara procesada.";
-                } catch (e) { console.error(e); }
+                    document.getElementById(`rango-${this.id}-0`).focus();
+
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR de cámara completado usando recuadros fijos!";
+
+                } catch (err) {
+                    console.error(err);
+                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al procesar el OCR de la cámara.";
+                }
             }
 
             exportarExcel() {
-                if (this.tablaData.length === 0) return alert("No hay datos en la tabla.");
-                const ws = XLSX.utils.json_to_sheet(this.tablaData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Datos_OCR");
-                XLSX.writeFile(wb, `OCR_${this.id === '1' ? 'LoteFotos' : 'Camara'}.xlsx`);
+                if (this.tablaData.length === 0) {
+                    alert("La tabla está vacía.");
+                    return;
+                }
+                const worksheet = XLSX.utils.json_to_sheet(this.tablaData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "OCR_Datos");
+                XLSX.writeFile(workbook, `Datos_OCR_${this.id === '1' ? 'LoteFotos' : 'Camara'}.xlsx`);
             }
         }
 
         const appFotos = new ExtractorOCRApp('1', false);
         const appCamara = new ExtractorOCRApp('2', true);
-        window.onload = () => { appFotos.init(); appCamara.init(); };
+
+        window.onload = function() {
+            appFotos.init();
+            appCamara.init();
+        }
     </script>
 </body>
 </html>
