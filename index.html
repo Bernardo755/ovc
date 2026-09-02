@@ -260,17 +260,36 @@
 
       
     <!-- PESTAÑA 2 -->
-    <div id="tab-2" class="tab-content">
+   <!-- PESTAÑA 2 -->
+    <div id="tab-2" class="tab-content active">
         <div class="config-section">
             <label for="num-rangos-2">Recuadros OCR:</label>
-            <input type="number" id="num-rangos-2" min="1" max="20" value="4" onchange="appCamara.actualizarCantidadRangos()">
+            <input type="number" id="num-rangos-2" min="1" max="20" value="4">
             
             <label for="select-camara">Cámara:</label>
             <select id="select-camara">
                 <option value="">-- Detectando cámaras... --</option>
             </select>
 
-            <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
+            <div class="slider-group">
+                <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
+                <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
+            </div>
+
+            <div class="slider-group">
+                <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
+                <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
+            </div>
+
+            <label>Filtro OpenCV: 
+                <select id="filtro">
+                    <option value="normal">Normal (Con Ajustes de Luz)</option>
+                    <option value="gris">Escala de Grises</option>
+                    <option value="canny">Detección de Bordes (Canny)</option>
+                </select>
+            </label>
+
+            <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar</button>
         </div>
 
         <div class="upload-section">
@@ -300,38 +319,11 @@
                         <canvas id="outputCanvas"></canvas>
                         <div id="sel-box-2" class="selection-box"></div>
                         <div id="zoom-box-2" class="zoom-selection-box"></div>
-                        <div class="slider-group">
-
                     </div>
                 </div>
                 <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara con OpenCV.</p>
-
-
-                     <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
-                <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
             </div>
 
-            <div class="slider-group">
-                <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
-                <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
-            </div>
-
-            <label>Filtro OpenCV: 
-                <select id="filtro">
-                    <option value="normal">Normal (Con Ajustes de Luz)</option>
-                    <option value="gris">Escala de Grises</option>
-                    <option value="canny">Detección de Bordes (Canny)</option>
-                </select>
-            </label>
-            </div>
-
-
-        
-
-               
-
-
-        
             <div class="pane">
                 <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
                 <div id="campos-container-2" class="campos-dinamicos-container"></div>
