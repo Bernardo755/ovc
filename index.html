@@ -294,6 +294,14 @@
                     <button class="btn btn-secondary" onclick="appCamara.resetZoom()" style="margin:0; width:auto; padding: 5px 8px; font-size: 11px;" title="Resetear Zoom">↺ Reset</button>
                 </div>
 
+                <div id="container-2" class="image-scroll-container modo-seleccionar">
+                    <div id="wrapper-2" class="canvas-wrapper">
+                        <video id="cam-video" autoplay playsinline muted></video>
+                        <canvas id="outputCanvas"></canvas>
+                        <div id="sel-box-2" class="selection-box"></div>
+                        <div id="zoom-box-2" class="zoom-selection-box"></div>
+                        <div class="slider-group">
+
                     </div>
                 </div>
                 <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara con OpenCV.</p>
@@ -301,13 +309,7 @@
 
 
         
-<div id="container-2" class="image-scroll-container modo-seleccionar">
-                    <div id="wrapper-2" class="canvas-wrapper">
-                        <video id="cam-video" autoplay playsinline muted></video>
-                        <canvas id="outputCanvas"></canvas>
-                        <div id="sel-box-2" class="selection-box"></div>
-                        <div id="zoom-box-2" class="zoom-selection-box"></div>
-                        <div class="slider-group">
+
                 <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
                 <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
             </div>
