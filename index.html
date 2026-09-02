@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <!-- =========================================================================
+         1. CABECERA Y LIBRERÍAS EXTERNAS (CDN)
+         - Propósito: Cargar los motores externos necesarios para procesar Excel y OCR.
+         - Módulos complementarios: Se enlaza directamente con Tesseract.js (para el 
+           reconocimiento óptico de caracteres) y SheetJS (para exportar los datos a Excel).
+         ========================================================================= -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor OCR Masivo - Rango 0 y Selector de Cámara (Con OpenCV.js)</title>
+    <title>Extractor OCR Masivo - Rango 0 y Selector de Cámara (Con Memoria de Recuadros)</title>
     
     <!-- SheetJS: Manejo y exportación de tablas a archivos Excel (.xlsx) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -11,10 +17,14 @@
     <!-- Tesseract.js: Motor de inteligencia artificial para lectura de texto (OCR) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-    <!-- OpenCV.js: Procesamiento de imagen y filtros en tiempo real -->
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
-
     <style>
+        /* =========================================================================
+           2. ESTILOS CSS GENERALES Y COMPONENTES VISUALES
+           - Propósito: Dar diseño, adaptabilidad (responsive), estética moderna y 
+             control visual de contenedores, tablas, botones y cajas de selección.
+           - Módulos complementarios: Da soporte visual directo a las pestañas, 
+             vistas previas de imágenes, video en vivo de la cámara y las tablas de datos.
+           ========================================================================= */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f6f9;
@@ -71,11 +81,11 @@
             flex-wrap: wrap;
         }
         .config-section label { font-weight: bold; color: #2980b9; }
-        .config-section input[type="number"], .config-section select, .config-section input[type="range"] {
+        .config-section input[type="number"], .config-section select {
             padding: 6px; font-size: 14px; border: 1px solid #bdc3c7; border-radius: 4px; background: white;
         }
         .config-section input[type="number"] { width: 70px; text-align: center; }
-        .config-section select { min-width: 200px; }
+        .config-section select { min-width: 220px; }
 
         .upload-section {
             display: flex; gap: 15px; justify-content: center; margin-bottom: 20px;
@@ -111,8 +121,7 @@
         .canvas-wrapper { position: absolute; transform-origin: 0 0; user-select: none; }
         .preview-img { display: block; pointer-events: none; }
 
-        #cam-video { display: block; }
-        #outputCanvas { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        #cam-video { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
         .selection-box {
             position: absolute; border: 2px dashed #e74c3c; background: rgba(231, 76, 60, 0.25); display: none; z-index: 10;
@@ -170,7 +179,6 @@
             max-height: 220px; overflow-y: auto; padding-right: 5px; border: 1px solid #eee;
             background: #fff; padding: 8px; border-radius: 4px; margin-bottom: 10px;
         }
-        .slider-group { display: flex; flex-direction: column; align-items: center; font-size: 13px; gap: 3px; }
     </style>
 </head>
 <body>
@@ -258,96 +266,75 @@
             </div>
         </div>
 
-      
-    <!-- PESTAÑA 2 -->
-   <!-- PESTAÑA 2 -->
-    <div id="tab-2" class="tab-content active">
-        <div class="config-section">
-            <label for="num-rangos-2">Recuadros OCR:</label>
-            <input type="number" id="num-rangos-2" min="1" max="20" value="4">
-            
-            <label for="select-camara">Cámara:</label>
-            <select id="select-camara">
-                <option value="">-- Detectando cámaras... --</option>
-            </select>
-
-            <div class="slider-group">
-                <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
-                <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
-            </div>
-
-            <div class="slider-group">
-                <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
-                <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
-            </div>
-
-            <label>Filtro OpenCV: 
-                <select id="filtro">
-                    <option value="normal">Normal (Con Ajustes de Luz)</option>
-                    <option value="gris">Escala de Grises</option>
-                    <option value="canny">Detección de Bordes (Canny)</option>
-                </select>
-            </label>
-
-            <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar</button>
-        </div>
-
-        <div class="upload-section">
-            <button class="btn btn-secondary" onclick="appCamara.iniciarCamara()" style="margin:0; flex:1;">▶️ Encender Cámara Seleccionada</button>
-            <button class="btn btn-danger" onclick="appCamara.apagarCamara()" style="margin:0; flex:1;">⏹️ Apagar Cámara</button>
-        </div>
-
-        <div class="loading-status" id="loading-status-2">Selecciona una cámara y enciéndela para comenzar.</div>
-
-        <div class="workspace">
-            <div class="pane">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h3 style="margin:0; border:none;">Proyección (<span id="active-box-label-2">Rango 1</span>/<span id="total-box-label-2">4</span>)</h3>
-                    <button class="btn btn-warning" onclick="appCamara.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Reubicar / Redibujar</button>
-                </div>
-
-                <div style="display: flex; gap: 5px; margin-bottom: 8px;">
-                    <button id="btn-modo-sel-2" class="btn btn-secondary btn-mode active" onclick="appCamara.cambiarModo('seleccionar')" style="margin:0; flex:1;">✏️ 1. Seleccionar Rango</button>
-                    <button id="btn-modo-zoom-2" class="btn btn-warning btn-mode" onclick="appCamara.cambiarModo('zoom-area')" style="margin:0; flex:1;">🔍 2. Zoom por Área</button>
-                    <button id="btn-modo-nav-2" class="btn btn-secondary btn-mode" onclick="appCamara.cambiarModo('navegar')" style="margin:0; flex:1; background-color: #34495e;">✋ 3. Mover</button>
-                    <button class="btn btn-secondary" onclick="appCamara.resetZoom()" style="margin:0; width:auto; padding: 5px 8px; font-size: 11px;" title="Resetear Zoom">↺ Reset</button>
-                </div>
-
-                <div id="container-2" class="image-scroll-container modo-seleccionar">
-                    <div id="wrapper-2" class="canvas-wrapper">
-                        <video id="cam-video" autoplay playsinline muted></video>
-                        <canvas id="outputCanvas"></canvas>
-                        <div id="sel-box-2" class="selection-box"></div>
-                        <div id="zoom-box-2" class="zoom-selection-box"></div>
-                    </div>
-                </div>
-                <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara con OpenCV.</p>
-            </div>
-
-            <div class="pane">
-                <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
-                <div id="campos-container-2" class="campos-dinamicos-container"></div>
-
-                <button class="btn" onclick="appCamara.ejecutarProcesoCamara()">⚡ Ejecutar OCR de Cámara ➡️</button>
-
-                <h3 style="margin-top: 15px;">3. Tabla Acumulada</h3>
-                <div style="overflow-x: auto; max-height: 140px;">
-                    <table id="tabla-datos-2">
-                        <thead>
-                            <tr id="tabla-head-2"><th>❌</th><th>Captura / Hora</th></tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+        <!-- PESTAÑA 2 -->
+        <div id="tab-2" class="tab-content">
+            <div class="config-section">
+                <label for="num-rangos-2">Recuadros OCR:</label>
+                <input type="number" id="num-rangos-2" min="1" max="20" value="4" onchange="appCamara.actualizarCantidadRangos()">
                 
-                <div style="display: flex; gap: 8px; margin-top: 10px;">
-                    <button class="btn btn-secondary" onclick="appCamara.exportarExcel()" style="margin:0; flex:1;">📥 Descargar Excel</button>
-                    <button class="btn btn-danger" onclick="appCamara.limpiarTodoApp()" style="margin:0; flex:1;">🗑️ Limpiar Todo</button>
+                <label for="select-camara">Cámara:</label>
+                <select id="select-camara">
+                    <option value="">-- Detectando cámaras... --</option>
+                </select>
+
+                <button class="btn btn-warning" onclick="appCamara.resetearConfiguracionRangos()" style="width: auto; margin:0; padding: 6px 12px; font-size: 13px;">🔄 Reiniciar / Borrar Memoria</button>
+            </div>
+
+            <div class="upload-section">
+                <button class="btn btn-secondary" onclick="appCamara.iniciarCamara()" style="margin:0; flex:1;">▶️ Encender Cámara Seleccionada</button>
+                <button class="btn btn-danger" onclick="appCamara.apagarCamara()" style="margin:0; flex:1;">⏹️ Apagar Cámara</button>
+            </div>
+
+            <div class="loading-status" id="loading-status-2">Selecciona una cámara y enciéndela para comenzar.</div>
+
+            <div class="workspace">
+                <div class="pane">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <h3 style="margin:0; border:none;">Proyección (<span id="active-box-label-2">Rango 1</span>/<span id="total-box-label-2">4</span>)</h3>
+                        <button class="btn btn-warning" onclick="appCamara.reiniciarRecuadrosActuales()" style="margin:0; width:auto; padding: 4px 8px; font-size: 11px;">🔄 Reubicar / Redibujar</button>
+                    </div>
+
+                    <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                        <button id="btn-modo-sel-2" class="btn btn-secondary btn-mode active" onclick="appCamara.cambiarModo('seleccionar')" style="margin:0; flex:1;">✏️ 1. Seleccionar Rango</button>
+                        <button id="btn-modo-zoom-2" class="btn btn-warning btn-mode" onclick="appCamara.cambiarModo('zoom-area')" style="margin:0; flex:1;">🔍 2. Zoom por Área</button>
+                        <button id="btn-modo-nav-2" class="btn btn-secondary btn-mode" onclick="appCamara.cambiarModo('navegar')" style="margin:0; flex:1; background-color: #34495e;">✋ 3. Mover</button>
+                        <button class="btn btn-secondary" onclick="appCamara.resetZoom()" style="margin:0; width:auto; padding: 5px 8px; font-size: 11px;" title="Resetear Zoom">↺ Reset</button>
+                    </div>
+
+                    <div id="container-2" class="image-scroll-container modo-seleccionar">
+                        <div id="wrapper-2" class="canvas-wrapper">
+                            <video id="cam-video" autoplay playsinline muted></video>
+                            <div id="sel-box-2" class="selection-box"></div>
+                            <div id="zoom-box-2" class="zoom-selection-box"></div>
+                        </div>
+                    </div>
+                    <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara.</p>
+                </div>
+
+                <div class="pane">
+                    <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
+                    <div id="campos-container-2" class="campos-dinamicos-container"></div>
+
+                    <button class="btn" onclick="appCamara.ejecutarProcesoCamara()">⚡ Ejecutar OCR de Cámara ➡️</button>
+
+                    <h3 style="margin-top: 15px;">3. Tabla Acumulada</h3>
+                    <div style="overflow-x: auto; max-height: 140px;">
+                        <table id="tabla-datos-2">
+                            <thead>
+                                <tr id="tabla-head-2"><th>❌</th><th>Captura / Hora</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button class="btn btn-secondary" onclick="appCamara.exportarExcel()" style="margin:0; flex:1;">📥 Descargar Excel</button>
+                        <button class="btn btn-danger" onclick="appCamara.limpiarTodoApp()" style="margin:0; flex:1;">🗑️ Limpiar Todo</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
     <script>
         function cambiarPestaña(num) {
@@ -432,8 +419,6 @@
                 const btnNav = document.getElementById(`btn-modo-nav-${this.id}`);
                 const txtInstruccion = document.getElementById(`modo-instruccion-${this.id}`);
 
-
-            
                 btnSel.classList.remove('active');
                 btnZoom.classList.remove('active');
                 btnNav.classList.remove('active');
@@ -452,7 +437,6 @@
                     txtInstruccion.innerText = "💡 Modo actual: Haz clic y arrastra para moverte libremente.";
                 }
             }
-
 
             actualizarCantidadRangos() {
                 let val = parseInt(document.getElementById(`num-rangos-${this.id}`).value);
@@ -1074,55 +1058,6 @@
             appFotos.init();
             appCamara.init();
         }
-
-
-        procesarFrame() {
-        if (!this.streaming) return;
-
-        let ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-        
-        if (this.canvas.width !== this.video.videoWidth && this.video.videoWidth > 0) {
-            this.canvas.width = this.video.videoWidth;
-            this.canvas.height = this.video.videoHeight;
-        }
-
-        ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-        if (typeof cv !== 'undefined' && cv.Mat) {
-            try {
-                let src = cv.imread(this.canvas);
-                let dst = new cv.Mat();
-                let tipoFiltro = this.filtroSelect.value;
-                let brightness = parseInt(this.brightnessInput.value);
-                let contrast = parseFloat(this.contrastInput.value);
-
-                src.convertTo(src, -1, contrast, brightness);
-
-                if (tipoFiltro === 'gris') {
-                    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
-                    cv.imshow(this.canvas, dst);
-                } else if (tipoFiltro === 'canny') {
-                    let gray = new cv.Mat();
-                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-                    cv.Canny(gray, dst, 50, 150);
-                    cv.imshow(this.canvas, dst);
-                    gray.delete();
-                } else {
-                    cv.imshow(this.canvas, src);
-                }
-
-                src.delete();
-                dst.delete();
-            } catch (e) {
-                console.error("Error en procesamiento OpenCV:", e);
-            }
-        }
-
-        if (this.streaming) {
-            requestAnimationFrame(() => this.procesarFrame());
-        }
-    }
-
     </script>
 </body>
 </html>
