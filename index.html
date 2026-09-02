@@ -179,6 +179,63 @@
             max-height: 220px; overflow-y: auto; padding-right: 5px; border: 1px solid #eee;
             background: #fff; padding: 8px; border-radius: 4px; margin-bottom: 10px;
         }
+
+
+/* --- Estilos para la sección de OpenCV Webcam en Vivo --- */
+.opencv-webcam-container {
+    text-align: center;
+    background: #222;
+    color: #fff;
+    padding: 10px;
+    border-radius: var(--radius);
+}
+.opencv-webcam-container video { display: none; }
+.opencv-webcam-container canvas { 
+    border: 2px solid #007bff; 
+    border-radius: 8px; 
+    max-width: 100%; 
+    margin-top: 15px; 
+}
+.opencv-controls { 
+    margin-top: 15px; 
+    display: flex; 
+    gap: 15px; 
+    justify-content: center; 
+    align-items: center; 
+    flex-wrap: wrap; 
+    background: #333; 
+    padding: 15px; 
+    border-radius: 8px; 
+}
+.opencv-controls button { 
+    background-color: #28a745; 
+    color: white; 
+    border: none; 
+    padding: 10px 20px; 
+    font-size: 14px; 
+    border-radius: 5px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    transition: 0.2s; 
+}
+.opencv-controls button:hover { opacity: 0.9; }
+.opencv-controls button.off { background-color: #dc3545; }
+.opencv-controls select, .opencv-controls input[type="range"] { 
+    padding: 6px; 
+    border-radius: 4px; 
+    font-weight: bold; 
+    cursor: pointer; 
+}
+.slider-group { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    font-size: 14px; 
+    gap: 5px; 
+}
+
+
+        
     </style>
 </head>
 <body>
@@ -1058,6 +1115,84 @@
             appFotos.init();
             appCamara.init();
         }
+
+
+
+
+
+class OpenCVWebcamModule {
+    constructor(videoId, canvasId, btnToggleId, brightnessId, contrastId, filtroId) {
+        this.video = document.getElementById(videoId);
+        this.canvas = document.getElementById(canvasId);
+        this.btnToggle = document.getElementById(btnToggleId);
+        this.brightnessInput = document.getElementById(brightnessId);
+        this.contrastInput = document.getElementById(contrastId);
+        this.filtroSelect = document.getElementById(filtroId);
+        
+        this.streaming = false;
+        this.stream = null;
+    }
+
+    toggleCamara() {
+        if (!this.streaming) {
+            this.iniciarCamara();
+        } else {
+            this.detenerCamara();
+        }
+    }
+
+
+
+    procesarFrame() {
+        if (!this.streaming) return;
+
+        let ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+        if (typeof cv !== 'undefined' && cv.Mat) {
+            try {
+                let src = cv.imread(this.canvas);
+                let dst = new cv.Mat();
+                let tipoFiltro = this.filtroSelect.value;
+
+                let brightness = parseInt(this.brightnessInput.value);
+                let contrast = parseFloat(this.contrastInput.value);
+
+                // Aplicar brillo y contraste
+                src.convertTo(src, -1, contrast, brightness);
+
+                if (tipoFiltro === 'gris') {
+                    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+                    cv.imshow(this.canvas, dst);
+                } else if (tipoFiltro === 'canny') {
+                    let gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                    cv.Canny(gray, dst, 50, 150);
+                    cv.imshow(this.canvas, dst);
+                    gray.delete();
+                } else {
+                    cv.imshow(this.canvas, src);
+                }
+
+                src.delete();
+                dst.delete();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Llamada recursiva optimizada dentro del módulo
+        if (this.streaming) {
+            requestAnimationFrame(() => this.procesarFrame());
+        }
+    }
+}
+
+// Ejemplo de inicialización cuando cargues tu app principal:
+// const opcvCam = new OpenCVWebcamModule('webcam', 'outputCanvas', 'btnToggle', 'brightness', 'contrast', 'filtro');
+// Y en tu botón HTML pones: onclick="opcvCam.toggleCamara()"
+
+        
     </script>
 </body>
 </html>
