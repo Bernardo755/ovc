@@ -17,8 +17,6 @@
     <!-- Tesseract.js: Motor de inteligencia artificial para lectura de texto (OCR) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
-
     <style>
         /* =========================================================================
            2. ESTILOS CSS GENERALES Y COMPONENTES VISUALES
@@ -181,8 +179,6 @@
             max-height: 220px; overflow-y: auto; padding-right: 5px; border: 1px solid #eee;
             background: #fff; padding: 8px; border-radius: 4px; margin-bottom: 10px;
         }
-
-   
     </style>
 </head>
 <body>
@@ -315,38 +311,6 @@
                     <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara.</p>
                 </div>
 
-
-<div class="controls">
-    
-        <div class="slider-group">
-            <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
-            <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
-        </div>
-
-        <div class="slider-group">
-            <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
-            <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
-        </div>
-
-        <label>Filtro OpenCV: 
-            <select id="filtro">
-                <option value="normal">Normal (Con Ajustes de Luz)</option>
-                <option value="gris">Escala de Grises</option>
-                <option value="canny">Detección de Bordes (Canny)</option>
-            </select>
-        </label>
-    </div>
-    
-    <video id="webcam" autoplay playsinline></video>
-    <canvas id="outputCanvas"></canvas>
-
-
-
-
-
-
-
-                
                 <div class="pane">
                     <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
                     <div id="campos-container-2" class="campos-dinamicos-container"></div>
@@ -1075,118 +1039,6 @@
                 }
             }
 
-
-
-
-
-<script>
-        let video = document.getElementById('webcam');
-        let canvas = document.getElementById('outputCanvas');
-        let btnToggle = document.getElementById('btnToggle');
-        let streaming = false;
-        let stream = null;
-
-        function toggleCamara() {
-            if (!streaming) {
-                iniciarCamara();
-            } else {
-                detenerCamara();
-            }
-        }
-
-        async function iniciarCamara() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                    audio: false 
-                });
-                video.srcObject = stream;
-                video.play();
-                
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    streaming = true;
-                    btnToggle.innerText = "Apagar Cámara";
-                    btnToggle.classList.add('off');
-                    procesarFrame();
-                };
-            } catch (err) {
-                alert("No se pudo acceder a la cámara: " + err);
-            }
-        }
-
-        function detenerCamara() {
-            if (stream) {
-                let tracks = stream.getTracks();
-                tracks.forEach(track => track.stop());
-                video.srcObject = null;
-            }
-            streaming = false;
-            btnToggle.innerText = "Encender Cámara";
-            btnToggle.classList.remove('off');
-            
-            let ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-
-        function procesarFrame() {
-            if (!streaming) return;
-
-            let ctx = canvas.getContext('2d', { willReadFrequently: true });
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            if (typeof cv !== 'undefined' && cv.Mat) {
-                try {
-                    let src = cv.imread(canvas);
-                    let dst = new cv.Mat();
-                    let tipoFiltro = document.getElementById('filtro').value;
-
-                    // Obtener valores de los controles deslizantes de luz
-                    let brightness = parseInt(document.getElementById('brightness').value);
-                    let contrast = parseFloat(document.getElementById('contrast').value);
-
-                    // Aplicar brillo y contraste usando la función nativa de OpenCV (convertTo)
-                    // dst = src * alpha (contraste) + beta (brillo)
-                    src.convertTo(src, -1, contrast, brightness);
-
-                    if (tipoFiltro === 'gris') {
-                        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
-                        cv.imshow(canvas, dst);
-                    } else if (tipoFiltro === 'canny') {
-                        let gray = new cv.Mat();
-                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-                        cv.Canny(gray, dst, 50, 150);
-                        cv.imshow(canvas, dst);
-                        gray.delete();
-                    } else {
-                        cv.imshow(canvas, src);
-                    }
-
-                    src.delete();
-                    dst.delete();
-                } catch (e) {
-                    console.error(e);
-                }
-            }
-
-            requestAnimationFrame(procesarFrame);
-        }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
             exportarExcel() {
                 if (this.tablaData.length === 0) {
                     alert("La tabla está vacía.");
@@ -1206,13 +1058,6 @@
             appFotos.init();
             appCamara.init();
         }
-
-
-
-
-
-
-        
     </script>
 </body>
 </html>
