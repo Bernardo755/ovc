@@ -182,62 +182,7 @@
             background: #fff; padding: 8px; border-radius: 4px; margin-bottom: 10px;
         }
 
-
-/* --- Estilos para la sección de OpenCV Webcam en Vivo --- */
-.opencv-webcam-container {
-    text-align: center;
-    background: #222;
-    color: #fff;
-    padding: 10px;
-    border-radius: var(--radius);
-}
-.opencv-webcam-container video { display: none; }
-.opencv-webcam-container canvas { 
-    border: 2px solid #007bff; 
-    border-radius: 8px; 
-    max-width: 100%; 
-    margin-top: 15px; 
-}
-.opencv-controls { 
-    margin-top: 15px; 
-    display: flex; 
-    gap: 15px; 
-    justify-content: center; 
-    align-items: center; 
-    flex-wrap: wrap; 
-    background: #333; 
-    padding: 15px; 
-    border-radius: 8px; 
-}
-.opencv-controls button { 
-    background-color: #28a745; 
-    color: white; 
-    border: none; 
-    padding: 10px 20px; 
-    font-size: 14px; 
-    border-radius: 5px; 
-    cursor: pointer; 
-    font-weight: bold; 
-    transition: 0.2s; 
-}
-.opencv-controls button:hover { opacity: 0.9; }
-.opencv-controls button.off { background-color: #dc3545; }
-.opencv-controls select, .opencv-controls input[type="range"] { 
-    padding: 6px; 
-    border-radius: 4px; 
-    font-weight: bold; 
-    cursor: pointer; 
-}
-.slider-group { 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    font-size: 14px; 
-    gap: 5px; 
-}
-
-
-        
+   
     </style>
 </head>
 <body>
@@ -370,6 +315,39 @@
                     <p id="modo-instruccion-2" style="font-size: 11px; color: #2980b9; margin-top: 6px; font-weight: bold;">💡 Dibuja los recuadros una vez. Se mantendrán fijos en las capturas de cámara.</p>
                 </div>
 
+
+<div class="controls">
+        <button id="btnToggle" onclick="toggleCamara()">Encender Cámara</button>
+        
+        <div class="slider-group">
+            <label for="brightness">Brillo: <span id="valBrightness">0</span></label>
+            <input type="range" id="brightness" min="-100" max="100" value="0" oninput="document.getElementById('valBrightness').innerText=this.value">
+        </div>
+
+        <div class="slider-group">
+            <label for="contrast">Contraste: <span id="valContrast">1.0</span></label>
+            <input type="range" id="contrast" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('valContrast').innerText=this.value">
+        </div>
+
+        <label>Filtro OpenCV: 
+            <select id="filtro">
+                <option value="normal">Normal (Con Ajustes de Luz)</option>
+                <option value="gris">Escala de Grises</option>
+                <option value="canny">Detección de Bordes (Canny)</option>
+            </select>
+        </label>
+    </div>
+    
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="outputCanvas"></canvas>
+
+
+
+
+
+
+
+                
                 <div class="pane">
                     <h3>2. Campos Extraídos (Rango 0 + OCR)</h3>
                     <div id="campos-container-2" class="campos-dinamicos-container"></div>
@@ -1102,112 +1080,99 @@
 
 
 
-class OpenCVWebcamModule {
-    constructor(videoId, canvasId, btnToggleId, brightnessId, contrastId, filtroId) {
-        this.video = document.getElementById(videoId);
-        this.canvas = document.getElementById(canvasId);
-        this.btnToggle = document.getElementById(btnToggleId);
-        this.brightnessInput = document.getElementById(brightnessId);
-        this.contrastInput = document.getElementById(contrastId);
-        this.filtroSelect = document.getElementById(filtroId);
-        
-        this.streaming = false;
-        this.stream = null;
-    }
+<script>
+        let video = document.getElementById('webcam');
+        let canvas = document.getElementById('outputCanvas');
+        let btnToggle = document.getElementById('btnToggle');
+        let streaming = false;
+        let stream = null;
 
-    toggleCamara() {
-        if (!this.streaming) {
-            this.iniciarCamara();
-        } else {
-            this.detenerCamara();
-        }
-    }
-
-    async iniciarCamara() {
-        try {
-            this.stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
-                audio: false 
-            });
-            this.video.srcObject = this.stream;
-            this.video.play();
-            
-            this.video.onloadedmetadata = () => {
-                this.canvas.width = this.video.videoWidth;
-                this.canvas.height = this.video.videoHeight;
-                this.streaming = true;
-                this.btnToggle.innerText = "Apagar Cámara";
-                this.btnToggle.classList.add('off');
-                this.procesarFrame();
-            };
-        } catch (err) {
-            alert("No se pudo acceder a la cámara: " + err);
-        }
-    }
-
-    detenerCamara() {
-        if (this.stream) {
-            let tracks = this.stream.getTracks();
-            tracks.forEach(track => track.stop());
-            this.video.srcObject = null;
-        }
-        this.streaming = false;
-        this.btnToggle.innerText = "Encender Cámara";
-        this.btnToggle.classList.remove('off');
-        
-        let ctx = this.canvas.getContext('2d');
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-
-    procesarFrame() {
-        if (!this.streaming) return;
-
-        let ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-        if (typeof cv !== 'undefined' && cv.Mat) {
-            try {
-                let src = cv.imread(this.canvas);
-                let dst = new cv.Mat();
-                let tipoFiltro = this.filtroSelect.value;
-
-                let brightness = parseInt(this.brightnessInput.value);
-                let contrast = parseFloat(this.contrastInput.value);
-
-                // Aplicar brillo y contraste
-                src.convertTo(src, -1, contrast, brightness);
-
-                if (tipoFiltro === 'gris') {
-                    cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
-                    cv.imshow(this.canvas, dst);
-                } else if (tipoFiltro === 'canny') {
-                    let gray = new cv.Mat();
-                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-                    cv.Canny(gray, dst, 50, 150);
-                    cv.imshow(this.canvas, dst);
-                    gray.delete();
-                } else {
-                    cv.imshow(this.canvas, src);
-                }
-
-                src.delete();
-                dst.delete();
-            } catch (e) {
-                console.error(e);
+        function toggleCamara() {
+            if (!streaming) {
+                iniciarCamara();
+            } else {
+                detenerCamara();
             }
         }
 
-        // Llamada recursiva optimizada dentro del módulo
-        if (this.streaming) {
-            requestAnimationFrame(() => this.procesarFrame());
+        async function iniciarCamara() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                video.play();
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    streaming = true;
+                    btnToggle.innerText = "Apagar Cámara";
+                    btnToggle.classList.add('off');
+                    procesarFrame();
+                };
+            } catch (err) {
+                alert("No se pudo acceder a la cámara: " + err);
+            }
         }
-    }
-}
 
-// Ejemplo de inicialización cuando cargues tu app principal:
-// const opcvCam = new OpenCVWebcamModule('webcam', 'outputCanvas', 'btnToggle', 'brightness', 'contrast', 'filtro');
-// Y en tu botón HTML pones: onclick="opcvCam.toggleCamara()"
+        function detenerCamara() {
+            if (stream) {
+                let tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            streaming = false;
+            btnToggle.innerText = "Encender Cámara";
+            btnToggle.classList.remove('off');
+            
+            let ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
 
+        function procesarFrame() {
+            if (!streaming) return;
+
+            let ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (typeof cv !== 'undefined' && cv.Mat) {
+                try {
+                    let src = cv.imread(canvas);
+                    let dst = new cv.Mat();
+                    let tipoFiltro = document.getElementById('filtro').value;
+
+                    // Obtener valores de los controles deslizantes de luz
+                    let brightness = parseInt(document.getElementById('brightness').value);
+                    let contrast = parseFloat(document.getElementById('contrast').value);
+
+                    // Aplicar brillo y contraste usando la función nativa de OpenCV (convertTo)
+                    // dst = src * alpha (contraste) + beta (brillo)
+                    src.convertTo(src, -1, contrast, brightness);
+
+                    if (tipoFiltro === 'gris') {
+                        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+                        cv.imshow(canvas, dst);
+                    } else if (tipoFiltro === 'canny') {
+                        let gray = new cv.Mat();
+                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                        cv.Canny(gray, dst, 50, 150);
+                        cv.imshow(canvas, dst);
+                        gray.delete();
+                    } else {
+                        cv.imshow(canvas, src);
+                    }
+
+                    src.delete();
+                    dst.delete();
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            requestAnimationFrame(procesarFrame);
+        }
 
 
 
