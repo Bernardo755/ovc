@@ -107,7 +107,7 @@
             transform-origin: 0 0;
         }
 
-        .preview-img, video {
+        .preview-img, video, canvas.live-preview-canvas {
             display: block;
             max-width: none;
             pointer-events: none;
@@ -210,6 +210,8 @@
                 this.streamCamara = null;
                 this.listaImagenes = [];
                 this.indiceActual = 0;
+                this.animFrameId = null;
+                this.offscreenCanvas = document.createElement('canvas');
             }
 
             init() {
@@ -251,18 +253,16 @@
                             <input type="range" id="input-contraste-${this.id}" min="20" max="250" value="100" style="width:100%; cursor:pointer;">
                         </div>
 
-                        <!-- 2. BLOQUE: MEJORAS DE IMAGEN ACTIVAS CON OPENCV -->
+                        <!-- 2. BLOQUE: HERRAMIENTA OPENCV EN LISTA DESPLEGABLE -->
                         <div class="section-box" style="border-color: #4a90e2;">
-                            <h4><i class="fas fa-microchip"></i> Motor de OpenCV Activo</h4>
-                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer; margin-bottom:4px;">
-                                <input type="checkbox" id="cv-gris-${this.id}" checked style="margin-right:6px; cursor:pointer;"> 1. Convertir a Escala de Grises
-                            </label>
-                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer; margin-bottom:4px;">
-                                <input type="checkbox" id="cv-otsu-${this.id}" checked style="margin-right:6px; cursor:pointer;"> 2. Binarización Umbral Otsu
-                            </label>
-                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer;">
-                                <input type="checkbox" id="cv-denoise-${this.id}" style="margin-right:6px; cursor:pointer;"> 3. Reducción Avanzada de Ruido
-                            </label>
+                            <h4><i class="fas fa-microchip"></i> Herramienta OpenCV Activa</h4>
+                            <label style="font-size: 11px; color: #aaa; margin-bottom: 4px; display: block;">Selecciona el filtro a aplicar:</label>
+                            <select id="select-cv-tool-${this.id}">
+                                <option value="ninguno">Ninguno (Original)</option>
+                                <option value="gris">1. Escala de Grises</option>
+                                <option value="otsu" selected>2. Binarización Umbral Otsu</option>
+                                <option value="denoise">3. Reducción de Ruido (Bilateral)</option>
+                            </select>
                         </div>
 
                         <div>
@@ -291,7 +291,7 @@
 
                         <div class="media-container" id="container-${this.id}">
                             <div class="media-wrapper" id="wrapper-${this.id}">
-                                ${this.esCamara ? `<video id="cam-video" autoplay playsinline></video>` : `<span style="color: #666; padding: 20px;">Sube imágenes...</span>`}
+                                ${this.esCamara ? `<canvas id="cam-canvas-${this.id}" class="live-preview-canvas"></canvas><video id="cam-video" style="display:none;" autoplay playsinline></video>` : `<span style="color: #666; padding: 20px;">Sube imágenes...</span>`}
                                 <div id="sel-box-${this.id}" class="selection-box"></div>
                                 <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
                             </div>
@@ -387,54 +387,45 @@
                 } catch (e) { console.error(e); }
             }
 
-            aplicarMejorasOpenCV(canvasSource) {
+            // PROCESAMIENTO OPENCV SELECCIONADO (APLICADO EN TIEMPO REAL A LA CÁMARA O A RECORTE DE FOTO)
+            procesarConOpenCV(canvasInput) {
                 if (typeof cv === 'undefined' || !cv.Mat) {
-                    console.warn("OpenCV cargando...");
-                    return canvasSource.toDataURL('image/png');
+                    return canvasInput.toDataURL('image/png');
+                }
+
+                const herramienta = document.getElementById(`select-cv-tool-${this.id}`).value;
+                if (herramienta === 'ninguno') {
+                    return canvasInput.toDataURL('image/png');
                 }
 
                 try {
-                    let src = cv.imread(canvasSource);
+                    let src = cv.imread(canvasInput);
                     let dst = new cv.Mat();
 
-                    let usarGris = document.getElementById(`cv-gris-${this.id}`).checked;
-                    let usarOtsu = document.getElementById(`cv-otsu-${this.id}`).checked;
-                    let usarDenoise = document.getElementById(`cv-denoise-${this.id}`).checked;
-
-                    if (usarGris || usarOtsu) {
+                    if (herramienta === 'gris') {
                         cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
+                    } else if (herramienta === 'otsu') {
+                        let gray = new cv.Mat();
+                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+                        cv.threshold(gray, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                        gray.delete();
+                    } else if (herramienta === 'denoise') {
+                        let gray = new cv.Mat();
+                        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+                        cv.bilateralFilter(gray, dst, 9, 75, 75);
+                        gray.delete();
                     } else {
                         src.copyTo(dst);
                     }
 
-                    if (usarDenoise) {
-                        let tmp = new cv.Mat();
-                        cv.bilateralFilter(dst, tmp, 9, 75, 75);
-                        dst.delete();
-                        dst = tmp;
-                    }
-
-                    if (usarOtsu) {
-                        let tmp = new cv.Mat();
-                        if (!usarGris && !usarDenoise) {
-                            cv.cvtColor(dst, tmp, cv.COLOR_RGBA2GRAY, 0);
-                            cv.threshold(tmp, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-                            tmp.delete();
-                        } else {
-                            cv.threshold(dst, tmp, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-                            dst.delete();
-                            dst = tmp;
-                        }
-                    }
-
-                    cv.imshow(canvasSource, dst);
+                    cv.imshow(canvasInput, dst);
                     src.delete();
                     dst.delete();
                 } catch (err) {
                     console.error("Error aplicando OpenCV:", err);
                 }
 
-                return canvasSource.toDataURL('image/png');
+                return canvasInput.toDataURL('image/png');
             }
 
             cambiarModo(modo) {
@@ -548,23 +539,51 @@
                     this.streamCamara = await navigator.mediaDevices.getUserMedia({
                         video: deviceId ? { deviceId: { exact: deviceId } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
                     });
-                    const wrapper = document.getElementById(`wrapper-${this.id}`);
-                    wrapper.innerHTML = `
-                        <video id="cam-video" autoplay playsinline></video>
-                        <div id="sel-box-${this.id}" class="selection-box"></div>
-                        <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
-                    `;
-                    this.mediaElement = document.getElementById(`cam-video`);
-                    this.mediaElement.srcObject = this.streamCamara;
+                    
+                    const videoEl = document.getElementById(`cam-video`);
+                    videoEl.srcObject = this.streamCamara;
+                    
+                    await new Promise((resolve) => {
+                        videoEl.onloadedmetadata = () => {
+                            videoEl.play();
+                            resolve();
+                        };
+                    });
+
+                    const canvasCam = document.getElementById(`cam-canvas-${this.id}`);
+                    canvasCam.width = videoEl.videoWidth || 1280;
+                    canvasCam.height = videoEl.videoHeight || 720;
+                    
+                    this.mediaElement = canvasCam;
                     this.resetZoom();
                     this.actualizarFiltroVisualPantalla();
                     this.configurarInteraccionCanvas();
                     if (this.recuadrosActuales.length === this.totalRangos) this.redibujarRecuadrosEnPantalla();
                     this.actualizarUIformulario();
-                } catch (e) { alert("No se pudo iniciar la cámara."); }
+
+                    // Bucle de renderizado en tiempo real aplicando OpenCV al canvas de la cámara
+                    const ctxCam = canvasCam.getContext('2d');
+                    const loopCamara = () => {
+                        if (!this.streamCamara) return;
+                        if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+                            ctxCam.drawImage(videoEl, 0, 0, canvasCam.width, canvasCam.height);
+                            this.procesarConOpenCV(canvasCam);
+                        }
+                        this.animFrameId = requestAnimationFrame(loopCamara);
+                    };
+                    loopCamara();
+
+                } catch (e) { 
+                    console.error(e);
+                    alert("No se pudo iniciar la cámara."); 
+                }
             }
 
             apagarCamara() {
+                if (this.animFrameId) {
+                    cancelAnimationFrame(this.animFrameId);
+                    this.animFrameId = null;
+                }
                 if (this.streamCamara) {
                     this.streamCamara.getTracks().forEach(t => t.stop());
                     this.streamCamara = null;
@@ -718,7 +737,7 @@
                         resultados[i] = await new Promise(resolve => {
                             imgObj.onload = async () => {
                                 ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                                let processedDataUrl = this.aplicarMejorasOpenCV(canvas);
+                                let processedDataUrl = this.procesarConOpenCV(canvas);
                                 let ret = await worker.recognize(processedDataUrl);
                                 resolve(ret.data.text.trim().replace(/\s+/g, ' '));
                             };
@@ -746,9 +765,9 @@
                 if (!this.streamCamara) return alert("Enciende la cámara primero.");
 
                 document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Procesando frame con OpenCV y Tesseract...";
-                const videoEl = document.getElementById(`cam-video`);
-                const scaleX = (videoEl.videoWidth || 1280) / videoEl.clientWidth;
-                const scaleY = (videoEl.videoHeight || 720) / videoEl.clientHeight;
+                const canvasCam = document.getElementById(`cam-canvas-${this.id}`);
+                const scaleX = canvasCam.width / canvasCam.clientWidth;
+                const scaleY = canvasCam.height / canvasCam.clientHeight;
                 let resultados = new Array(this.totalRangos).fill('');
 
                 try {
@@ -761,8 +780,8 @@
                         canvas.width = w; canvas.height = h;
                         let ctx = canvas.getContext('2d');
                         
-                        ctx.drawImage(videoEl, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                        let processedDataUrl = this.aplicarMejorasOpenCV(canvas);
+                        ctx.drawImage(canvasCam, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
+                        let processedDataUrl = canvas.toDataURL('image/png');
 
                         let ret = await worker.recognize(processedDataUrl);
                         resultados[i] = ret.data.text.trim().replace(/\s+/g, ' ');
