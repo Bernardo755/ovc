@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extractor OCR Inteligente</title>
+    <title>Extractor OCR Inteligente con OpenCV</title>
     
-    <!-- Tesseract y SheetJS -->
+    <!-- Tesseract, SheetJS y OpenCV.js -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -73,7 +74,7 @@
         }
 
         .sidebar {
-            width: 320px;
+            width: 350px;
             background: var(--panel-bg);
             padding: 20px;
             border-right: 1px solid var(--border);
@@ -112,7 +113,7 @@
             pointer-events: none;
         }
 
-        /* Estilos de los recuadros */
+        /* Estilos de recuadros dinamicos */
         .selection-box {
             position: absolute; border: 2px dashed #ffeb3b; background: rgba(255, 235, 59, 0.2);
             pointer-events: none; display: none; z-index: 10;
@@ -124,12 +125,11 @@
         .saved-box {
             position: absolute; border: 2px solid #4caf50; background: rgba(76, 175, 80, 0.2);
             pointer-events: none; z-index: 5; display: flex; justify-content: center; align-items: center;
-            color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000;
+            color: #fff; font-weight: bold; font-size: 11px; text-shadow: 1px 1px 2px #000;
         }
 
-        /* Inputs y Botones */
-        input[type="text"], input[type="file"], select {
-            width: 100%; padding: 10px; background: #111; border: 1px solid var(--border);
+        input[type="text"], input[type="file"], input[type="number"], select {
+            width: 100%; padding: 8px; background: #111; border: 1px solid var(--border);
             color: #fff; border-radius: 5px; outline: none; margin-bottom: 5px;
         }
 
@@ -150,7 +150,7 @@
         .toolbar .btn.active { background: var(--accent); }
 
         .table-container {
-            height: 250px; background: var(--panel-bg); overflow: auto; border-top: 1px solid var(--border);
+            height: 220px; background: var(--panel-bg); overflow: auto; border-top: 1px solid var(--border);
         }
 
         table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -165,6 +165,15 @@
             background: #222; padding: 12px; border-radius: 8px; border: 1px solid #444;
         }
         .filters-container input[type="range"] { width: 100%; margin: 5px 0 10px; cursor: pointer; }
+        
+        .dynamic-fields-container {
+            max-height: 180px;
+            overflow-y: auto;
+            background: #222;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #444;
+        }
     </style>
 </head>
 <body>
@@ -174,13 +183,8 @@
         <button class="tab-btn" onclick="switchTab('tab2')"><i class="fas fa-camera"></i> Cámara en Vivo</button>
     </div>
 
-    <div id="tab1" class="tab-content active">
-        <div id="app-1" class="app-layout"></div>
-    </div>
-    
-    <div id="tab2" class="tab-content">
-        <div id="app-2" class="app-layout"></div>
-    </div>
+    <div id="tab1" class="tab-content active"><div id="app-1" class="app-layout"></div></div>
+    <div id="tab2" class="tab-content"><div id="app-2" class="app-layout"></div></div>
 
     <script>
         function switchTab(tabId) {
@@ -194,7 +198,7 @@
             constructor(id, esCamara) {
                 this.id = id;
                 this.esCamara = esCamara;
-                this.totalRangos = 3; // 3 recuadros OCR
+                this.totalRangos = 3; // Valor inicial por defecto
                 this.tablaData = [];
                 this.recuadrosActuales = [];
                 this.modoActual = 'seleccionar';
@@ -205,9 +209,7 @@
                 this.isDraggingImage = false;
                 this.mediaElement = null;
                 this.streamCamara = null;
-                this.currentFilter = '';
-
-                // Para Lotes de Fotos
+                
                 this.listaImagenes = [];
                 this.indiceActual = 0;
             }
@@ -215,65 +217,55 @@
             init() {
                 this.setupHTML();
                 this.configurarControlesBasicos();
-                if (this.esCamara) {
-                    this.poblarCamaras();
-                }
+                if (this.esCamara) this.poblarCamaras();
             }
 
             setupHTML() {
                 const appContainer = document.getElementById(`app-${this.id}`);
-                
-                let inputArea = '';
-                if (!this.esCamara) {
-                    inputArea = `
-                        <label>Subir Imágenes o Carpeta:</label>
-                        <input type="file" id="file-upload-${this.id}" multiple accept="image/*">
-                        <div id="queue-banner-${this.id}" style="display:none; background:#333; padding:10px; border-radius:5px; margin-bottom:10px; text-align:center;">
-                            <span id="queue-text-${this.id}" style="font-weight:bold; color:var(--accent);"></span><br>
-                            <span id="current-filename-${this.id}" style="font-size:12px; color:#aaa;"></span>
-                        </div>
-                    `;
-                } else {
-                    inputArea = `
-                        <label>Seleccionar Cámara:</label>
-                        <select id="select-camara"></select>
-                        <div style="display:flex; gap:5px;">
-                            <button class="btn btn-primary" id="btn-iniciar-cam-${this.id}"><i class="fas fa-play"></i> Iniciar</button>
-                            <button class="btn btn-danger" id="btn-apagar-cam-${this.id}"><i class="fas fa-stop"></i> Apagar</button>
-                        </div>
-                    `;
-                }
+                let inputArea = !this.esCamara 
+                    ? `<label>Subir Imágenes o Carpeta:</label><input type="file" id="file-upload-${this.id}" multiple accept="image/*">
+                       <div id="queue-banner-${this.id}" style="display:none; background:#333; padding:8px; border-radius:5px; text-align:center;">
+                           <span id="queue-text-${this.id}" style="font-weight:bold; color:var(--accent);"></span><br>
+                           <span id="current-filename-${this.id}" style="font-size:11px; color:#aaa;"></span>
+                       </div>`
+                    : `<label>Cámara:</label><select id="select-camara"></select>
+                       <div style="display:flex; gap:5px;">
+                           <button class="btn btn-primary" id="btn-iniciar-cam-${this.id}"><i class="fas fa-play"></i> Iniciar</button>
+                           <button class="btn btn-danger" id="btn-apagar-cam-${this.id}"><i class="fas fa-stop"></i> Apagar</button>
+                       </div>`;
 
                 appContainer.innerHTML = `
                     <div class="sidebar">
                         ${inputArea}
                         
+                        <div>
+                            <label style="color:var(--accent); font-weight:bold;"><i class="fas fa-list-ol"></i> Cantidad de Campos (1 - 20):</label>
+                            <input type="number" id="num-campos-${this.id}" min="1" max="20" value="3">
+                        </div>
+
                         <div class="filters-container">
-                            <h4 style="margin: 0 0 10px 0; font-size: 14px; color:#ddd;"><i class="fas fa-sliders-h"></i> Ajustes Pre-OCR</h4>
-                            <label style="font-size: 12px;">Brillo: <span id="val-brillo-${this.id}">100</span>%</label>
-                            <input type="range" id="input-brillo-${this.id}" min="30" max="250" value="100">
+                            <h4 style="margin: 0 0 8px 0; font-size: 13px; color:#ddd;"><i class="fas fa-microchip"></i> OpenCV Pre-Procesamiento</h4>
+                            <label style="font-size: 11px;">Brillo OpenCV: <span id="val-brillo-${this.id}">0</span> (-100 a 100)</label>
+                            <input type="range" id="input-brillo-${this.id}" min="-100" max="100" value="0">
                             
-                            <label style="font-size: 12px;">Contraste: <span id="val-contraste-${this.id}">100</span>%</label>
-                            <input type="range" id="input-contraste-${this.id}" min="30" max="250" value="100">
+                            <label style="font-size: 11px;">Contraste OpenCV: <span id="val-contraste-${this.id}">1.0</span> (0.5 a 3.0)</label>
+                            <input type="range" id="input-contraste-${this.id}" min="0.5" max="3.0" step="0.1" value="1.0">
                             
-                            <label style="font-size: 12px; display:flex; align-items:center; cursor:pointer;">
-                                <input type="checkbox" id="input-bn-${this.id}" style="margin-right:5px; cursor:pointer;"> Binarizar (Blanco y Negro)
+                            <label style="font-size: 11px; display:flex; align-items:center; cursor:pointer; margin-top:5px;">
+                                <input type="checkbox" id="input-bn-${this.id}" checked style="margin-right:5px; cursor:pointer;"> Binarización Otsu (OpenCV)
                             </label>
                         </div>
 
                         <div>
-                            <label style="color:#ffeb3b;"><i class="fas fa-keyboard"></i> R0 (Referencia Manual):</label>
+                            <label style="color:#ffeb3b; font-size:12px;"><i class="fas fa-keyboard"></i> R0 (Referencia Manual):</label>
                             <input type="text" id="rango-${this.id}-0" placeholder="Escribe el n° de referencia...">
                         </div>
                         
-                        <div style="background:#222; padding:10px; border-radius:5px; border:1px solid #444;">
-                            <h4 style="margin-bottom:10px; font-size:13px; text-align:center;">Resultados OCR</h4>
-                            ${[1, 2, 3].map(i => `
-                                <div style="margin-bottom:8px;">
-                                    <label style="font-size:12px; color:#aaa;">Rango ${i}:</label>
-                                    <input type="text" id="rango-${this.id}-${i}" readonly style="background:#1a1a1a; color:#4caf50; font-weight:bold;">
-                                </div>
-                            `).join('')}
+                        <div style="background:#222; padding:8px; border-radius:5px; border:1px solid #444;">
+                            <h4 style="margin-bottom:8px; font-size:12px; text-align:center;">Resultados OCR por Campos</h4>
+                            <div class="dynamic-fields-container" id="dynamic-inputs-container-${this.id}">
+                                <!-- Generado dinamicamente -->
+                            </div>
                         </div>
 
                         <button id="btn-ejecutar-${this.id}" class="btn btn-success"><i class="fas fa-bolt"></i> Ejecutar OCR</button>
@@ -292,30 +284,20 @@
 
                         <div class="media-container" id="container-${this.id}">
                             <div class="media-wrapper" id="wrapper-${this.id}">
-                                ${this.esCamara 
-                                    ? `<video id="cam-video" autoplay playsinline></video>
-                                       <div id="sel-box-${this.id}" class="selection-box"></div>
-                                       <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>` 
-                                    : `<span style="color: #666; padding: 20px; display: block;">Sube imágenes para comenzar</span>
-                                       <div id="sel-box-${this.id}" class="selection-box"></div>
-                                       <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>`
-                                }
+                                ${this.esCamara ? `<video id="cam-video" autoplay playsinline></video>` : `<span style="color: #666; padding: 20px;">Sube imágenes...</span>`}
+                                <div id="sel-box-${this.id}" class="selection-box"></div>
+                                <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
                             </div>
                         </div>
 
-                        <div class="status-bar" id="loading-status-${this.id}">
-                            Esperando acción del usuario...
-                        </div>
+                        <div class="status-bar" id="loading-status-${this.id}">Esperando OpenCV y acciones...</div>
 
                         <div class="table-container">
                             <table id="tabla-${this.id}">
                                 <thead>
-                                    <tr>
+                                    <tr id="table-head-tr-${this.id}">
                                         <th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th>
                                         <th>R0 (Manual)</th>
-                                        <th>R1</th>
-                                        <th>R2</th>
-                                        <th>R3</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -339,41 +321,100 @@
                 document.getElementById(`btn-exportar-${this.id}`).addEventListener('click', () => this.exportarExcel());
                 document.getElementById(`btn-limpiar-${this.id}`).addEventListener('click', () => this.limpiarTodoApp());
 
-                // Configurar Filtros (Canvas + CSS)
-                ['input-brillo-', 'input-contraste-', 'input-bn-'].forEach(prefix => {
-                    const el = document.getElementById(`${prefix}${this.id}`);
-                    if(el) {
-                        el.addEventListener('input', () => this.aplicarFiltrosUI());
+                // Cambio dinámico de cantidad de campos (1 a 20)
+                document.getElementById(`num-campos-${this.id}`).addEventListener('change', (e) => {
+                    let val = parseInt(e.target.value);
+                    if (val < 1) val = 1;
+                    if (val > 20) val = 20;
+                    e.target.value = val;
+                    this.totalRangos = val;
+                    this.actualizarInputsDinamicosYTabla();
+                    if (this.recuadrosActuales.length > this.totalRangos) {
+                        this.recuadrosActuales = this.recuadrosActuales.slice(0, this.totalRangos);
+                        this.redibujarRecuadrosEnPantalla();
                     }
+                    this.actualizarUIformulario();
                 });
+
+                // Listeners sliders de OpenCV
+                ['input-brillo-', 'input-contraste-'].forEach(prefix => {
+                    const el = document.getElementById(`${prefix}${this.id}`);
+                    if(el) el.addEventListener('input', () => {
+                        document.getElementById(`val-brillo-${this.id}`).innerText = document.getElementById(`input-brillo-${this.id}`).value;
+                        document.getElementById(`val-contraste-${this.id}`).innerText = document.getElementById(`input-contraste-${this.id}`).value;
+                    });
+                });
+
+                this.actualizarInputsDinamicosYTabla();
+            }
+
+            actualizarInputsDinamicosYTabla() {
+                // Inputs laterales
+                const container = document.getElementById(`dynamic-inputs-container-${this.id}`);
+                container.innerHTML = '';
+                for (let i = 1; i <= this.totalRangos; i++) {
+                    container.innerHTML += `
+                        <div style="margin-bottom:6px;">
+                            <label style="font-size:11px; color:#aaa;">Rango ${i}:</label>
+                            <input type="text" id="rango-${this.id}-${i}" readonly style="background:#1a1a1a; color:#4caf50; font-weight:bold; padding:5px;">
+                        </div>
+                    `;
+                }
+
+                // Columnas de la tabla inferior
+                const trHead = document.getElementById(`table-head-tr-${this.id}`);
+                let htmlTh = `<th>${this.esCamara ? 'Captura / Hora' : 'Archivo'}</th><th>R0 (Manual)</th>`;
+                for (let i = 1; i <= this.totalRangos; i++) {
+                    htmlTh += `<th>R${i}</th>`;
+                }
+                trHead.innerHTML = htmlTh;
+                this.tablaData = [];
+                this.renderizarTablaHTML();
             }
 
             async poblarCamaras() {
                 try {
                     const devices = await navigator.mediaDevices.enumerateDevices();
                     const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                    const select = document.getElementById('select-camara');
+                    const select = document.getElementById(`select-camara`);
                     select.innerHTML = videoDevices.map(d => `<option value="${d.deviceId}">${d.label || 'Cámara'}</option>`).join('');
-                } catch (e) {
-                    console.error("Error al leer cámaras:", e);
-                }
+                } catch (e) { console.error(e); }
             }
 
-            aplicarFiltrosUI() {
-                const brillo = document.getElementById(`input-brillo-${this.id}`).value;
-                const contraste = document.getElementById(`input-contraste-${this.id}`).value;
-                const bn = document.getElementById(`input-bn-${this.id}`).checked;
-
-                document.getElementById(`val-brillo-${this.id}`).innerText = brillo;
-                document.getElementById(`val-contraste-${this.id}`).innerText = contraste;
-
-                // Generamos la cadena del filtro
-                this.currentFilter = `brightness(${brillo}%) contrast(${contraste}%) ${bn ? 'grayscale(100%)' : ''}`;
-
-                // Aplicar visualmente en vivo
-                if (this.mediaElement) {
-                    this.mediaElement.style.filter = this.currentFilter;
+            // PROCESAMIENTO MATEMÁTICO CON OPENCV.JS
+            procesarConOpenCV(canvasSource) {
+                if (typeof cv === 'undefined' || !cv.Mat) {
+                    console.warn("OpenCV aún no carga completamente, devolviendo canvas original.");
+                    return canvasSource.toDataURL('image/png');
                 }
+
+                try {
+                    let src = cv.imread(canvasSource);
+                    let dst = new cv.Mat();
+
+                    let brillo = parseInt(document.getElementById(`input-brillo-${this.id}`).value);
+                    let contraste = parseFloat(document.getElementById(`input-contraste-${this.id}`).value);
+                    let usarBn = document.getElementById(`input-bn-${this.id}`).checked;
+
+                    // 1. Aplicar Brillo y Contraste: dst = src * alpha + beta
+                    src.convertTo(dst, -1, contraste, brillo);
+
+                    // 2. Si está activado, pasar a Grises y binarizar con Otsu
+                    if (usarBn) {
+                        let gray = new cv.Mat();
+                        cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY, 0);
+                        cv.threshold(gray, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                        gray.delete();
+                    }
+
+                    cv.imshow(canvasSource, dst);
+                    src.delete();
+                    dst.delete();
+                } catch (err) {
+                    console.error("Error en procesamiento OpenCV:", err);
+                }
+
+                return canvasSource.toDataURL('image/png');
             }
 
             cambiarModo(modo) {
@@ -384,15 +425,9 @@
                 
                 let btnId = modo === 'seleccionar' ? `mode-sel-${this.id}` : (modo === 'navegar' ? `mode-nav-${this.id}` : `mode-zoom-${this.id}`);
                 document.getElementById(btnId).classList.add('active');
-
+                
                 const container = document.getElementById(`container-${this.id}`);
-                if (modo === 'navegar') {
-                    container.style.cursor = 'grab';
-                } else if (modo === 'zoom-area') {
-                    container.style.cursor = 'zoom-in';
-                } else {
-                    container.style.cursor = 'crosshair';
-                }
+                container.style.cursor = modo === 'navegar' ? 'grab' : (modo === 'zoom-area' ? 'zoom-in' : 'crosshair');
             }
 
             renderizarTablaHTML() {
@@ -400,14 +435,12 @@
                 tbody.innerHTML = '';
                 this.tablaData.forEach(row => {
                     const tr = document.createElement('tr');
-                    const key1 = this.esCamara ? 'Captura / Hora' : 'Archivo';
-                    tr.innerHTML = `
-                        <td>${row[key1] || ''}</td>
-                        <td>${row['R0'] || ''}</td>
-                        <td>${row['R1'] || ''}</td>
-                        <td>${row['R2'] || ''}</td>
-                        <td>${row['R3'] || ''}</td>
-                    `;
+                    const keyMain = this.esCamara ? 'Captura / Hora' : 'Archivo';
+                    let htmlTd = `<td>${row[keyMain] || ''}</td><td>${row['R0'] || ''}</td>`;
+                    for(let i=1; i<=this.totalRangos; i++) {
+                        htmlTd += `<td>${row[`R${i}`] || ''}</td>`;
+                    }
+                    tr.innerHTML = htmlTd;
                     tbody.appendChild(tr);
                 });
                 const container = tbody.parentElement.parentElement;
@@ -431,17 +464,11 @@
 
             limpiarVisualesRecuadros() {
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
-                if (wrapper) {
-                    const boxes = wrapper.querySelectorAll('.saved-box');
-                    boxes.forEach(box => box.remove());
-                }
+                if (wrapper) wrapper.querySelectorAll('.saved-box').forEach(box => box.remove());
             }
 
-            // --- CÓDIGO INCORPORADO DE LA PARTE 2 ---
-
             limpiarTodoApp() {
-                if (!confirm("¿Estás seguro de que deseas limpiar todo (tabla, imágenes y recuadros guardados)?")) return;
-
+                if (!confirm("¿Deseas limpiar todos los registros y recuadros?")) return;
                 this.tablaData = [];
                 this.renderizarTablaHTML();
                 this.recuadrosActuales = [];
@@ -450,15 +477,11 @@
                 if (!this.esCamara) {
                     this.listaImagenes = [];
                     this.indiceActual = 0;
-                    const wrapper = document.getElementById(`wrapper-${this.id}`);
-                    wrapper.innerHTML = `<span style="color: #fff; padding: 20px; display: block;">Sin imágenes cargadas</span><div id="sel-box-${this.id}" class="selection-box"></div><div id="zoom-box-${this.id}" class="zoom-selection-box"></div>`;
+                    document.getElementById(`wrapper-${this.id}`).innerHTML = `<span style="color: #fff; padding: 20px;">Sin imágenes</span><div id="sel-box-${this.id}" class="selection-box"></div><div id="zoom-box-${this.id}" class="zoom-selection-box"></div>`;
                     document.getElementById(`queue-banner-${this.id}`).style.display = 'none';
-                    document.getElementById(`loading-status-${this.id}`).innerText = "Sube fotos o una carpeta para comenzar.";
                 } else {
                     this.apagarCamara();
-                    document.getElementById(`loading-status-${this.id}`).innerText = "Cámara apagada y datos limpiados.";
                 }
-
                 document.getElementById(`rango-${this.id}-0`).value = '';
             }
 
@@ -468,15 +491,10 @@
 
                 this.listaImagenes = [];
                 let cargados = 0;
-
                 files.forEach((file) => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        this.listaImagenes.push({
-                            file: file,
-                            name: file.name,
-                            src: e.target.result
-                        });
+                        this.listaImagenes.push({ file: file, name: file.name, src: e.target.result });
                         cargados++;
                         if (cargados === files.length) {
                             this.listaImagenes.sort((a, b) => a.name.localeCompare(b.name));
@@ -490,13 +508,10 @@
 
             mostrarFotoActual() {
                 if (this.listaImagenes.length === 0) return;
-                if (this.indiceActual >= this.listaImagenes.length) {
-                    this.indiceActual = this.listaImagenes.length - 1;
-                }
+                if (this.indiceActual >= this.listaImagenes.length) this.indiceActual = this.listaImagenes.length - 1;
 
                 const foto = this.listaImagenes[this.indiceActual];
                 const wrapper = document.getElementById(`wrapper-${this.id}`);
-                
                 wrapper.innerHTML = `
                     <img id="preview-img-${this.id}" class="preview-img" src="${foto.src}" alt="${foto.name}">
                     <div id="sel-box-${this.id}" class="selection-box"></div>
@@ -508,17 +523,11 @@
                 document.getElementById(`current-filename-${this.id}`).innerText = `📁 ${foto.name}`;
 
                 this.mediaElement = document.getElementById(`preview-img-${this.id}`);
-                this.aplicarFiltrosUI(); // Aplica filtros guardados a la nueva imagen
-
                 this.mediaElement.onload = () => {
                     this.resetZoom();
                     this.configurarInteraccionCanvas();
-                    
                     if (this.recuadrosActuales.length === this.totalRangos) {
                         this.redibujarRecuadrosEnPantalla();
-                        document.getElementById(`loading-status-${this.id}`).innerText = `✅ Foto cargada. Usando ${this.totalRangos} recuadros guardados previamente.`;
-                    } else {
-                        document.getElementById(`loading-status-${this.id}`).innerText = `✏️ Dibuja los recuadros (${this.recuadrosActuales.length}/${this.totalRangos}).`;
                     }
                     this.actualizarUIformulario();
                 };
@@ -527,56 +536,39 @@
             async iniciarCamara() {
                 try {
                     this.apagarCamara();
-                    const selectCam = document.getElementById(`select-camara`);
-                    const deviceIdSelected = selectCam.value;
+                    const deviceId = document.getElementById(`select-camara`).value;
+                    this.streamCamara = await navigator.mediaDevices.getUserMedia({
+                        video: deviceId ? { deviceId: { exact: deviceId } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
+                    });
+                    
+                    const wrapper = document.getElementById(`wrapper-${this.id}`);
+                    wrapper.innerHTML = `
+                        <video id="cam-video" autoplay playsinline></video>
+                        <div id="sel-box-${this.id}" class="selection-box"></div>
+                        <div id="zoom-box-${this.id}" class="zoom-selection-box"></div>
+                    `;
 
-                    const constraints = {
-                        video: deviceIdSelected ? { deviceId: { exact: deviceIdSelected } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
-                    };
-
-                    this.streamCamara = await navigator.mediaDevices.getUserMedia(constraints);
                     this.mediaElement = document.getElementById(`cam-video`);
                     this.mediaElement.srcObject = this.streamCamara;
-                    this.aplicarFiltrosUI(); // Aplica filtros al video
-                    
                     this.resetZoom();
                     this.configurarInteraccionCanvas();
-
-                    if (this.recuadrosActuales.length === this.totalRangos) {
-                        this.redibujarRecuadrosEnPantalla();
-                        document.getElementById(`loading-status-${this.id}`).innerText = "✅ Cámara activa. Usando recuadros guardados.";
-                    } else {
-                        document.getElementById(`loading-status-${this.id}`).innerText = `✏️ Cámara activa. Dibuja los recuadros (${this.recuadrosActuales.length}/${this.totalRangos}).`;
-                    }
+                    if (this.recuadrosActuales.length === this.totalRangos) this.redibujarRecuadrosEnPantalla();
                     this.actualizarUIformulario();
-                } catch (err) {
-                    console.error(err);
-                    alert("No se pudo iniciar la cámara seleccionada.");
-                }
+                } catch (err) { alert("No se pudo abrir la cámara."); }
             }
 
             apagarCamara() {
                 if (this.streamCamara) {
-                    this.streamCamara.getTracks().forEach(track => track.stop());
+                    this.streamCamara.getTracks().forEach(t => t.stop());
                     this.streamCamara = null;
                 }
-                const videoEl = document.getElementById(`cam-video`);
-                if (videoEl) videoEl.srcObject = null;
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏹️ Cámara apagada.";
+                const v = document.getElementById(`cam-video`);
+                if (v) v.srcObject = null;
             }
 
             resetZoom() {
-                this.scale = 1;
-                this.panX = 0;
-                this.panY = 0;
-                this.actualizarTransformacionCanvas();
-            }
-
-            actualizarTransformacionCanvas() {
-                const wrapper = document.getElementById(`wrapper-${this.id}`);
-                if (wrapper) {
-                    wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
-                }
+                this.scale = 1; this.panX = 0; this.panY = 0;
+                document.getElementById(`wrapper-${this.id}`).style.transform = `translate(0px, 0px) scale(1)`;
             }
 
             configurarInteraccionCanvas() {
@@ -588,347 +580,212 @@
                 container.onwheel = (e) => {
                     e.preventDefault();
                     if (!this.mediaElement) return;
-
-                    const rect = container.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const mouseY = e.clientY - rect.top;
-
-                    const zoomFactor = 1.15;
-                    let oldScale = this.scale;
-
-                    if (e.deltaY < 0) {
-                        this.scale *= zoomFactor;
-                    } else {
-                        this.scale /= zoomFactor;
-                    }
-
-                    this.scale = Math.max(0.5, Math.min(this.scale, 15));
-                    this.panX = mouseX - (mouseX - this.panX) * (this.scale / oldScale);
-                    this.panY = mouseY - (mouseY - this.panY) * (this.scale / oldScale);
-
-                    this.actualizarTransformacionCanvas();
+                    let rect = container.getBoundingClientRect();
+                    let mX = e.clientX - rect.left, mY = e.clientY - rect.top;
+                    let oldS = this.scale;
+                    this.scale = Math.max(0.5, Math.min(e.deltaY < 0 ? this.scale * 1.15 : this.scale / 1.15, 15));
+                    this.panX = mX - (mX - this.panX) * (this.scale / oldS);
+                    this.panY = mY - (mY - this.panY) * (this.scale / oldS);
+                    wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
                 };
 
                 container.onmousedown = (e) => {
                     if (!this.mediaElement) return;
-
                     if (e.button === 0) {
                         if (this.modoActual === 'navegar') {
                             this.isDraggingImage = true;
-                            this.startPanX = e.clientX - this.panX;
-                            this.startPanY = e.clientY - this.panY;
-                            document.addEventListener('mousemove', onMouseMoveGlobal);
-                            document.addEventListener('mouseup', onMouseUpGlobal);
-                            e.preventDefault();
-                            return;
+                            this.startPanX = e.clientX - this.panX; this.startPanY = e.clientY - this.panY;
+                            document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU);
+                            e.preventDefault(); return;
                         }
+                        if (this.recuadrosActuales.length >= this.totalRangos && this.modoActual === 'seleccionar') return;
 
-                        if (this.recuadrosActuales.length >= this.totalRangos && this.modoActual === 'seleccionar') {
-                            return;
-                        }
-
-                        const rect = wrapper.getBoundingClientRect();
+                        let rect = wrapper.getBoundingClientRect();
                         this.startX = (e.clientX - rect.left) / this.scale;
                         this.startY = (e.clientY - rect.top) / this.scale;
                         this.isDrawing = true;
 
-                        let activeBox = (this.modoActual === 'zoom-area') ? zoomBox : selectionBox;
-                        activeBox.style.left = this.startX + 'px';
-                        activeBox.style.top = this.startY + 'px';
-                        activeBox.style.width = '0px';
-                        activeBox.style.height = '0px';
-                        activeBox.style.display = 'block';
-
-                        document.addEventListener('mousemove', onMouseMoveGlobal);
-                        document.addEventListener('mouseup', onMouseUpGlobal);
+                        let activeB = this.modoActual === 'zoom-area' ? zoomBox : selectionBox;
+                        activeB.style.left = this.startX + 'px'; activeB.style.top = this.startY + 'px';
+                        activeB.style.width = '0px'; activeB.style.height = '0px'; activeB.style.display = 'block';
+                        document.addEventListener('mousemove', onMM); document.addEventListener('mouseup', onMU);
                         e.preventDefault();
                     }
                 };
 
-                const onMouseMoveGlobal = (e) => {
+                const onMM = (e) => {
                     if (this.isDraggingImage) {
-                        this.panX = e.clientX - this.startPanX;
-                        this.panY = e.clientY - this.startPanY;
-                        this.actualizarTransformacionCanvas();
+                        this.panX = e.clientX - this.startPanX; this.panY = e.clientY - this.startPanY;
+                        wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
                         return;
                     }
-
                     if (!this.isDrawing) return;
-                    const rect = wrapper.getBoundingClientRect();
-                    let currentX = (e.clientX - rect.left) / this.scale;
-                    let currentY = (e.clientY - rect.top) / this.scale;
-
-                    const width = currentX - this.startX;
-                    const height = currentY - this.startY;
-
-                    let activeBox = (this.modoActual === 'zoom-area') ? zoomBox : selectionBox;
-                    activeBox.style.width = Math.abs(width) + 'px';
-                    activeBox.style.height = Math.abs(height) + 'px';
-                    activeBox.style.left = (width < 0 ? currentX : this.startX) + 'px';
-                    activeBox.style.top = (height < 0 ? currentY : this.startY) + 'px';
+                    let rect = wrapper.getBoundingClientRect();
+                    let curX = (e.clientX - rect.left) / this.scale, curY = (e.clientY - rect.top) / this.scale;
+                    let w = curX - this.startX, h = curY - this.startY;
+                    let activeB = this.modoActual === 'zoom-area' ? zoomBox : selectionBox;
+                    activeB.style.width = Math.abs(w) + 'px'; activeB.style.height = Math.abs(h) + 'px';
+                    activeB.style.left = (w < 0 ? curX : this.startX) + 'px';
+                    activeB.style.top = (h < 0 ? curY : this.startY) + 'px';
                 };
 
-                const onMouseUpGlobal = (e) => {
-                    document.removeEventListener('mousemove', onMouseMoveGlobal);
-                    document.removeEventListener('mouseup', onMouseUpGlobal);
-
-                    if (this.isDraggingImage) {
-                        this.isDraggingImage = false;
-                        return;
-                    }
-
+                const onMU = () => {
+                    document.removeEventListener('mousemove', onMM); document.removeEventListener('mouseup', onMU);
+                    if (this.isDraggingImage) { this.isDraggingImage = false; return; }
                     if (!this.isDrawing) return;
                     this.isDrawing = false;
 
                     if (this.modoActual === 'zoom-area') {
-                        const width = parseFloat(zoomBox.style.width);
-                        const height = parseFloat(zoomBox.style.height);
                         zoomBox.style.display = 'none';
-
-                        if (width > 5 && height > 5) {
-                            const boxLeft = parseFloat(zoomBox.style.left);
-                            const boxTop = parseFloat(zoomBox.style.top);
-                            const containerWidth = container.clientWidth;
-                            const containerHeight = container.clientHeight;
-
-                            const scaleX = containerWidth / width;
-                            const scaleY = containerHeight / height;
-                            let newScale = Math.min(scaleX, scaleY);
-                            newScale = Math.max(1, Math.min(newScale, 15));
-
-                            this.scale = newScale;
-                            this.panX = -boxLeft * this.scale + (containerWidth - width * this.scale) / 2;
-                            this.panY = -boxTop * this.scale + (containerHeight - height * this.scale) / 2;
-
-                            this.actualizarTransformacionCanvas();
+                        let w = parseFloat(zoomBox.style.width), h = parseFloat(zoomBox.style.height);
+                        if (w > 5 && h > 5) {
+                            let bx = parseFloat(zoomBox.style.left), by = parseFloat(zoomBox.style.top);
+                            this.scale = Math.max(1, Math.min(Math.min(container.clientWidth/w, container.clientHeight/h), 15));
+                            this.panX = -bx * this.scale + (container.clientWidth - w * this.scale) / 2;
+                            this.panY = -by * this.scale + (container.clientHeight - h * this.scale) / 2;
+                            wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
                             this.cambiarModo('seleccionar');
                         }
                         return;
                     }
 
-                    const width = parseFloat(selectionBox.style.width);
-                    const height = parseFloat(selectionBox.style.height);
                     selectionBox.style.display = 'none';
-
-                    if (width > 3 && height > 3) {
-                        if (this.recuadrosActuales.length >= this.totalRangos) return;
-
-                        const boxData = {
-                            left: parseFloat(selectionBox.style.left),
-                            top: parseFloat(selectionBox.style.top),
-                            width: width,
-                            height: height
-                        };
-
+                    let w = parseFloat(selectionBox.style.width), h = parseFloat(selectionBox.style.height);
+                    if (w > 3 && h > 3 && this.recuadrosActuales.length < this.totalRangos) {
+                        let boxData = { left: parseFloat(selectionBox.style.left), top: parseFloat(selectionBox.style.top), width: w, height: h };
                         this.recuadrosActuales.push(boxData);
-
-                        const permBox = document.createElement('div');
+                        
+                        let permBox = document.createElement('div');
                         permBox.className = 'saved-box';
-                        permBox.style.left = boxData.left + 'px';
-                        permBox.style.top = boxData.top + 'px';
-                        permBox.style.width = boxData.width + 'px';
-                        permBox.style.height = boxData.height + 'px';
+                        permBox.style.left = boxData.left + 'px'; permBox.style.top = boxData.top + 'px';
+                        permBox.style.width = boxData.width + 'px'; permBox.style.height = boxData.height + 'px';
                         permBox.innerHTML = `<span>R${this.recuadrosActuales.length}</span>`;
                         wrapper.appendChild(permBox);
-
                         this.actualizarUIformulario();
-
-                        if (this.recuadrosActuales.length < this.totalRangos) {
-                            document.getElementById(`loading-status-${this.id}`).innerText = `✅ Rango ${this.recuadrosActuales.length} guardado. Falta(n) ${this.totalRangos - this.recuadrosActuales.length}.`;
-                        } else {
-                            document.getElementById(`loading-status-${this.id}`).innerText = `🎉 ¡${this.totalRangos} recuadros guardados! Listos para escanear.`;
-                        }
                     }
                 };
             }
 
             actualizarUIformulario() {
-                const siguienteRango = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
-                const el = document.getElementById(`active-box-label-${this.id}`);
-                if(el) el.innerText = siguienteRango;
+                let sig = Math.min(this.recuadrosActuales.length + 1, this.totalRangos);
+                let el = document.getElementById(`active-box-label-${this.id}`);
+                if (el) el.innerText = sig;
             }
 
             reiniciarRecuadrosActuales() {
                 this.recuadrosActuales = [];
                 this.limpiarVisualesRecuadros();
-                const selBox = document.getElementById(`sel-box-${this.id}`);
-                const zoomBox = document.getElementById(`zoom-box-${this.id}`);
-                if (selBox) selBox.style.display = 'none';
-                if (zoomBox) zoomBox.style.display = 'none';
-
-                for(let i=1; i<=this.totalRangos; i++) {
-                    const input = document.getElementById(`rango-${this.id}-${i}`);
-                    if(input) input.value = '';
+                document.getElementById(`sel-box-${this.id}`).style.display = 'none';
+                document.getElementById(`zoom-box-${this.id}`).style.display = 'none';
+                for (let i = 1; i <= this.totalRangos; i++) {
+                    let inp = document.getElementById(`rango-${this.id}-${i}`);
+                    if(inp) inp.value = '';
                 }
-                document.getElementById(`loading-status-${this.id}`).innerText = "🔄 MODO REUBICACIÓN: Dibuja los recuadros nuevamente.";
                 this.actualizarUIformulario();
             }
 
             async ejecutarProcesoYpasarSiguiente() {
-                if (this.listaImagenes.length === 0) {
-                    alert("No hay imágenes cargadas.");
-                    return;
-                }
-                if (this.recuadrosActuales.length < this.totalRangos) {
-                    alert(`Dibuja los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
-                    return;
-                }
+                if (!this.esCamara && this.listaImagenes.length === 0) return alert("Sube imágenes primero.");
+                if (this.recuadrosActuales.length < this.totalRangos) return alert(`Dibuja los ${this.totalRangos} recuadros requeridos.`);
 
                 const foto = this.listaImagenes[this.indiceActual];
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Ejecutando OCR en la imagen con los ajustes...";
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Procesando con OpenCV y Tesseract...";
 
                 const scaleX = this.mediaElement.naturalWidth / this.mediaElement.width;
                 const scaleY = this.mediaElement.naturalHeight / this.mediaElement.height;
-                let resultadosOCR = new Array(this.totalRangos).fill('');
+                let resultados = new Array(this.totalRangos).fill('');
 
                 try {
                     const worker = await Tesseract.createWorker('spa+eng');
-
                     for (let i = 0; i < this.totalRangos; i++) {
-                        const b = this.recuadrosActuales[i];
-                        const w = b.width * scaleX;
-                        const h = b.height * scaleY;
-                        
-                        const canvas = document.createElement('canvas');
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext('2d');
+                        let b = this.recuadrosActuales[i];
+                        let w = b.width * scaleX, h = b.height * scaleY;
 
-                        // ¡Aplicamos la mejora de imagen nativa antes del OCR!
-                        if(this.currentFilter) {
-                            ctx.filter = this.currentFilter;
-                        }
+                        let canvas = document.createElement('canvas');
+                        canvas.width = w; canvas.height = h;
+                        let ctx = canvas.getContext('2d');
 
-                        const imageObj = new Image();
-                        imageObj.src = foto.src;
+                        let imgObj = new Image();
+                        imgObj.src = foto.src;
                         
-                        const textoRecorte = await new Promise((resolve) => {
-                            imageObj.onload = async () => {
-                                ctx.drawImage(imageObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                                const croppedDataUrl = canvas.toDataURL('image/png');
-                                const ret = await worker.recognize(croppedDataUrl);
-                                let texto = ret.data.text.trim().replace(/\s*@\s*/g, '@').replace(/\s*\.\s*/g, '.').replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
-                                resolve(texto);
+                        resultados[i] = await new Promise(resolve => {
+                            imgObj.onload = async () => {
+                                ctx.drawImage(imgObj, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
+                                // APLICANDO OPENCV
+                                let processedDataUrl = this.procesarConOpenCV(canvas);
+                                let ret = await worker.recognize(processedDataUrl);
+                                resolve(ret.data.text.trim().replace(/\s+/g, ' '));
                             };
                         });
-
-                        resultadosOCR[i] = textoRecorte;
-                        document.getElementById(`rango-${this.id}-${i+1}`).value = textoRecorte;
+                        document.getElementById(`rango-${this.id}-${i+1}`).value = resultados[i];
                     }
-
                     await worker.terminate();
 
-                    const valR0 = document.getElementById(`rango-${this.id}-0`).value.trim();
-                    let rowData = { "Archivo": foto.name, "R0": valR0 };
-                    for (let i = 0; i < this.totalRangos; i++) { rowData[`R${i+1}`] = resultadosOCR[i]; }
+                    let rowData = { "Archivo": foto.name, "R0": document.getElementById(`rango-${this.id}-0`).value.trim() };
+                    for (let i = 0; i < this.totalRangos; i++) rowData[`R${i+1}`] = resultados[i];
                     this.tablaData.push(rowData);
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
-                    document.getElementById(`rango-${this.id}-0`).focus();
-
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR Completado! Pasando a la siguiente...";
-
                     setTimeout(() => {
                         this.indiceActual++;
-                        if (this.indiceActual < this.listaImagenes.length) {
-                            this.mostrarFotoActual();
-                        } else {
-                            this.indiceActual = this.listaImagenes.length - 1;
-                            document.getElementById(`loading-status-${this.id}`).innerText = "🏁 ¡Lote completado con éxito!";
-                        }
-                    }, 1000);
-
-                } catch (err) {
-                    console.error(err);
-                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al ejecutar el OCR masivo.";
-                }
+                        if (this.indiceActual < this.listaImagenes.length) this.mostrarFotoActual();
+                        else document.getElementById(`loading-status-${this.id}`).innerText = "🏁 ¡Lote finalizado!";
+                    }, 500);
+                } catch (e) { console.error(e); }
             }
 
             async ejecutarProcesoCamara() {
-                if (this.recuadrosActuales.length < this.totalRangos) {
-                    alert(`Dibuja los ${this.totalRangos} recuadros antes de ejecutar el OCR.`);
-                    return;
-                }
-                if (!this.streamCamara) {
-                    alert("La cámara no está encendida.");
-                    return;
-                }
+                if (this.recuadrosActuales.length < this.totalRangos) return alert(`Dibuja los ${this.totalRangos} recuadros requeridos.`);
+                if (!this.streamCamara) return alert("Enciende la cámara.");
 
-                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando y mejorando fotograma...";
-
+                document.getElementById(`loading-status-${this.id}`).innerText = "⏳ Capturando frame con OpenCV...";
                 const videoEl = document.getElementById(`cam-video`);
                 const scaleX = (videoEl.videoWidth || 1280) / videoEl.clientWidth;
                 const scaleY = (videoEl.videoHeight || 720) / videoEl.clientHeight;
-                let resultadosOCR = new Array(this.totalRangos).fill('');
+                let resultados = new Array(this.totalRangos).fill('');
 
                 try {
                     const worker = await Tesseract.createWorker('spa+eng');
-
                     for (let i = 0; i < this.totalRangos; i++) {
-                        const b = this.recuadrosActuales[i];
-                        const w = b.width * scaleX;
-                        const h = b.height * scaleY;
+                        let b = this.recuadrosActuales[i];
+                        let w = b.width * scaleX, h = b.height * scaleY;
 
-                        const canvas = document.createElement('canvas');
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext('2d');
-
-                        // ¡Aplicamos la mejora de imagen nativa al frame del video antes del OCR!
-                        if(this.currentFilter) {
-                            ctx.filter = this.currentFilter;
-                        }
-
+                        let canvas = document.createElement('canvas');
+                        canvas.width = w; canvas.height = h;
+                        let ctx = canvas.getContext('2d');
                         ctx.drawImage(videoEl, b.left * scaleX, b.top * scaleY, w, h, 0, 0, w, h);
-                        const croppedDataUrl = canvas.toDataURL('image/png');
 
-                        const ret = await worker.recognize(croppedDataUrl);
-                        let texto = ret.data.text.trim().replace(/\s*@\s*/g, '@').replace(/\s*\.\s*/g, '.').replace(/([a-zA-Z0-9._%+-])\s+([a-zA-Z0-9._%+-])/g, '$1$2');
-                        resultadosOCR[i] = texto;
-                        document.getElementById(`rango-${this.id}-${i+1}`).value = texto;
+                        // APLICANDO OPENCV
+                        let processedDataUrl = this.procesarConOpenCV(canvas);
+                        let ret = await worker.recognize(processedDataUrl);
+                        resultados[i] = ret.data.text.trim().replace(/\s+/g, ' ');
+                        document.getElementById(`rango-${this.id}-${i+1}`).value = resultados[i];
                     }
-
                     await worker.terminate();
 
-                    const valR0 = document.getElementById(`rango-${this.id}-0`).value.trim();
-                    const timestamp = new Date().toLocaleTimeString();
-                    
-                    let rowData = { "Captura / Hora": timestamp, "R0": valR0 };
-                    for (let i = 0; i < this.totalRangos; i++) { rowData[`R${i+1}`] = resultadosOCR[i]; }
+                    let rowData = { "Captura / Hora": new Date().toLocaleTimeString(), "R0": document.getElementById(`rango-${this.id}-0`).value.trim() };
+                    for (let i = 0; i < this.totalRangos; i++) rowData[`R${i+1}`] = resultados[i];
                     this.tablaData.push(rowData);
                     this.renderizarTablaHTML();
 
                     document.getElementById(`rango-${this.id}-0`).value = '';
-                    document.getElementById(`rango-${this.id}-0`).focus();
-
-                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ ¡OCR de cámara completado con mejoras!";
-                } catch (err) {
-                    console.error(err);
-                    document.getElementById(`loading-status-${this.id}`).innerText = "❌ Error al procesar el OCR de la cámara.";
-                }
+                    document.getElementById(`loading-status-${this.id}`).innerText = "✅ Captura de cámara procesada con éxito.";
+                } catch (e) { console.error(e); }
             }
 
             exportarExcel() {
-                if (this.tablaData.length === 0) {
-                    alert("La tabla está vacía.");
-                    return;
-                }
-                const worksheet = XLSX.utils.json_to_sheet(this.tablaData);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, "OCR_Datos");
-                XLSX.writeFile(workbook, `Datos_OCR_${this.id === '1' ? 'LoteFotos' : 'Camara'}.xlsx`);
+                if (this.tablaData.length === 0) return alert("No hay datos en la tabla.");
+                const ws = XLSX.utils.json_to_sheet(this.tablaData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Datos_OCR");
+                XLSX.writeFile(wb, `OCR_${this.id === '1' ? 'LoteFotos' : 'Camara'}.xlsx`);
             }
         }
 
-        // Inicializar Ambas Pestañas
         const appFotos = new ExtractorOCRApp('1', false);
         const appCamara = new ExtractorOCRApp('2', true);
-
-        window.onload = function() {
-            appFotos.init();
-            appCamara.init();
-        }
+        window.onload = () => { appFotos.init(); appCamara.init(); };
     </script>
 </body>
 </html>
