@@ -1098,26 +1098,6 @@
                 }
             }
 
-            exportarExcel() {
-                if (this.tablaData.length === 0) {
-                    alert("La tabla está vacía.");
-                    return;
-                }
-                const worksheet = XLSX.utils.json_to_sheet(this.tablaData);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, "OCR_Datos");
-                XLSX.writeFile(workbook, `Datos_OCR_${this.id === '1' ? 'LoteFotos' : 'Camara'}.xlsx`);
-            }
-        }
-
-        const appFotos = new ExtractorOCRApp('1', false);
-        const appCamara = new ExtractorOCRApp('2', true);
-
-        window.onload = function() {
-            appFotos.init();
-            appCamara.init();
-        }
-
 
 
 
@@ -1143,7 +1123,41 @@ class OpenCVWebcamModule {
         }
     }
 
+    async iniciarCamara() {
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                audio: false 
+            });
+            this.video.srcObject = this.stream;
+            this.video.play();
+            
+            this.video.onloadedmetadata = () => {
+                this.canvas.width = this.video.videoWidth;
+                this.canvas.height = this.video.videoHeight;
+                this.streaming = true;
+                this.btnToggle.innerText = "Apagar Cámara";
+                this.btnToggle.classList.add('off');
+                this.procesarFrame();
+            };
+        } catch (err) {
+            alert("No se pudo acceder a la cámara: " + err);
+        }
+    }
 
+    detenerCamara() {
+        if (this.stream) {
+            let tracks = this.stream.getTracks();
+            tracks.forEach(track => track.stop());
+            this.video.srcObject = null;
+        }
+        this.streaming = false;
+        this.btnToggle.innerText = "Encender Cámara";
+        this.btnToggle.classList.remove('off');
+        
+        let ctx = this.canvas.getContext('2d');
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
 
     procesarFrame() {
         if (!this.streaming) return;
@@ -1193,6 +1207,46 @@ class OpenCVWebcamModule {
 // Ejemplo de inicialización cuando cargues tu app principal:
 // const opcvCam = new OpenCVWebcamModule('webcam', 'outputCanvas', 'btnToggle', 'brightness', 'contrast', 'filtro');
 // Y en tu botón HTML pones: onclick="opcvCam.toggleCamara()"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+            exportarExcel() {
+                if (this.tablaData.length === 0) {
+                    alert("La tabla está vacía.");
+                    return;
+                }
+                const worksheet = XLSX.utils.json_to_sheet(this.tablaData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "OCR_Datos");
+                XLSX.writeFile(workbook, `Datos_OCR_${this.id === '1' ? 'LoteFotos' : 'Camara'}.xlsx`);
+            }
+        }
+
+        const appFotos = new ExtractorOCRApp('1', false);
+        const appCamara = new ExtractorOCRApp('2', true);
+
+        window.onload = function() {
+            appFotos.init();
+            appCamara.init();
+        }
+
+
+
+
+
 
         
     </script>
